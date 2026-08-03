@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+    <meta name="theme-color" content="#101214">
+
+    <meta name="application-name" content="Hé Guǐ Planner">
+    <meta name="apple-mobile-web-app-title" content="Hé Guǐ">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <title>Hé Guǐ Planner</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+   
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <main class="app-shell">
+
+        <header class="app-header">
+    <img
+        src="hegui-logo.png"
+        alt="Hé Guǐ three roster paths logo"
+        class="app-logo"
+    >
+
+    <h1>Hé Guǐ</h1>
+    <p class="subtitle">Roster Planner</p>
+</header>
+
+        <nav id="profile-tabs" class="profile-tabs" aria-label="Roster profiles">
+        </nav>
+
+        <button
+            id="profile-name-button"
+            class="profile-name-button"
+            type="button"
+            aria-label="Rename current profile"
+        ></button>
+
+        <section id="setup-screen" class="screen">
+            <div class="card">
+                <p class="eyebrow">Initial setup</p>
+
+                <h2>Select your roster</h2>
+
+                <p class="instructions">
+                    Check your official roster before continuing.
+                    You will need the roster number that represents today.
+                </p>
+
+                <label for="roster-select">Roster</label>
+
+                <select id="roster-select">
+                    <option value="">Choose your roster</option>
+                </select>
+
+                <label for="roster-day">What roster number is today?</label>
+
+                <input
+                    id="roster-day"
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    placeholder="For example: 56"
+                >
+
+                <button id="check-setup" class="primary-button">
+                    Check Today’s Shift
+                </button>
+            </div>
+        </section>
+
+        <section id="home-screen" class="screen hidden">
+
+            <div class="today-heading">
+                <p id="today-label">Today</p>
+                <h2 id="today-date"></h2>
+            </div>
+
+            <article class="shift-card">
+                <div id="shift-code" class="shift-code">—</div>
+                <div id="shift-time" class="shift-time"></div>
+                <div id="roster-name" class="roster-name"></div>
+                <div id="roster-position" class="roster-position"></div>
+            </article>
+
+            <div class="navigation-buttons">
+                <button id="previous-day" class="secondary-button">
+                    ‹ Previous
+                </button>
+
+                <button id="next-day" class="secondary-button">
+                    Next ›
+                </button>
+            </div>
+
+            <section class="week-section">
+                <h2>Next 7 Days</h2>
+                <div id="week-list" class="week-list"></div>
+            </section>
+
+            <button id="lookup-date" class="primary-button">
+                Look Up Date
+            </button>
+
+            <button id="print-roster" class="secondary-button full-width">
+                Print Roster Grid
+            </button>
+
+            <button id="settings-button" class="secondary-button full-width">
+    ⚙ Settings
+</button>
+
+<button id="extras-button" class="secondary-button full-width">
+    ✨ Extras
+</button>
+        </section>
+        <section id="settings-page" class="modal-page hidden">
+    <h2>⚙ Settings</h2>
+
+    <p>Accessibility</p>
+    <p>Display</p>
+    <p>Profiles</p>
+    <p>Roster</p>
+ 
+    <button id="reset-roster" class="secondary-button full-width">
+    Reset Current Roster
+    </button>
+ 
+    
+    <h3>About</h3>
+
+    <p><strong>Hé Guǐ Planner</strong></p>
+
+    <p>Version 1.0 Beta 2</p>
+
+    <p>Created by</p>
+
+    <p>James &amp; Gideon</p>
+
+    <button id="close-settings" class="primary-button">
+        Close
+    </button>
+</section>
+
+<section id="extras-page" class="modal-page hidden">
+    <h2>✨ Extras</h2>
+
+    <label><input type="checkbox"> ACT Public Holidays</label><br>
+    <label><input type="checkbox"> NSW Public Holidays</label><br>
+    <label><input type="checkbox"> ACT School Holidays</label><br>
+    <label><input type="checkbox"> NSW School Holidays</label><br>
+    <label><input type="checkbox"> Notifications</label><br>
+    <label><input type="checkbox"> Google Calendar</label>
+
+    <br><br>
+
+    <button id="close-extras" class="primary-button">
+        Close
+    </button>
+</section>
+                <footer>
+            <p class="authors">
+                Authors: James Gideon
+            </p>
+
+            <p>
+                Unofficial personal planning tool. Always confirm shifts
+                using your employer’s official roster.
+            </p>
+        </footer>
+
+    </main>
+
+    <script src="app.js?v=2"></script>
+</body>
+</html>
