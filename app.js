@@ -851,6 +851,7 @@ function printRosterGrid() {
         <html lang="en-AU">
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>${escapeHtml(roster.name)} Roster</title>
 
             <style>
@@ -860,9 +861,35 @@ function printRosterGrid() {
                 }
 
                 body {
-                    margin: 0;
+                    margin: 0 auto;
+                    max-width: 1200px;
+                    padding: 16px;
                     color: #111;
                     font-family: Arial, sans-serif;
+                }
+
+                .print-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    margin-bottom: 18px;
+                }
+
+                .print-actions button {
+                    min-height: 46px;
+                    padding: 0 18px;
+                    border: 1px solid #555;
+                    border-radius: 10px;
+                    background: #ffffff;
+                    color: #111111;
+                    font: inherit;
+                    font-weight: 700;
+                    cursor: pointer;
+                }
+
+                .print-actions .print-button {
+                    border-color: #c17a00;
+                    background: #ffb020;
                 }
 
                 h1 {
@@ -937,10 +964,38 @@ function printRosterGrid() {
                     margin-top: 9px;
                     font-size: 9px;
                 }
+
+                @media print {
+                    body {
+                        max-width: none;
+                        padding: 0;
+                    }
+
+                    .print-actions {
+                        display: none;
+                    }
+                }
             </style>
         </head>
 
         <body>
+            <div class="print-actions">
+                <button
+                    class="print-button"
+                    type="button"
+                    onclick="window.print()"
+                >
+                    Print or Save PDF
+                </button>
+
+                <button
+                    type="button"
+                    onclick="window.close()"
+                >
+                    Back to Hé Guǐ
+                </button>
+            </div>
+
             <h1>${escapeHtml(roster.name)}</h1>
 
             <div class="details">
@@ -964,14 +1019,10 @@ function printRosterGrid() {
             </table>
 
             <p class="notice">
-                Unofficial personal planning tool. Compare this grid with your
+                Personal planning tool. Compare this grid with your
                 employer’s official roster. Workplace roster changes
                 must be confirmed with management.
             </p>
-
-            <script>
-                window.onload = () => window.print();
-            <\/script>
         </body>
         </html>
     `);
