@@ -522,53 +522,6 @@ function beginSetupCheck() {
         anchorDate: dateKey(anchorDate)
     };
 
-    const checks = [0, 7, 14];
-
-    for (const daysAhead of checks) {
-        const checkDate = addDays(anchorDate, daysAhead);
-
-        const result = getShiftForDate(
-            checkDate,
-            proposedSetup
-        );
-
-        const dateText =
-            checkDate.toLocaleDateString("en-AU", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric"
-            });
-
-        const correct = confirm(
-            `${dateText}\n\n` +
-            `Roster number ${result.position}\n` +
-            `${displayShift(result.shift)}\n\n` +
-            `Does this match your official roster?`
-        );
-
-        if (!correct) {
-            alert(
-                "Setup has stopped. Check your selected roster " +
-                "and today’s roster number, then try again."
-            );
-
-            return;
-        }
-    }
-
-    const responsibilityAccepted = confirm(
-        "All three roster checks matched.\n\n" +
-        "I have compared these results with my official roster. " +
-        "I understand that HéGUI Roster is an unofficial " +
-        "planning tool and that workplace roster changes must " +
-        "be confirmed with my employer."
-    );
-
-    if (!responsibilityAccepted) {
-        return;
-    }
-
     setup = proposedSetup;
     profiles[activeProfileIndex].setup = setup;
     saveProfiles();
