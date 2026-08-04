@@ -839,14 +839,88 @@ function printRosterGrid() {
         .map(day => `<th>${escapeHtml(day)}</th>`)
         .join("");
 
-    const printWindow = window.open("", "_blank");
+    const existingPreview =
+        document.querySelector(".print-preview-overlay");
 
-    if (!printWindow) {
-        alert("Allow pop-ups to print the roster grid.");
-        return;
+    if (existingPreview) {
+        existingPreview.remove();
     }
 
-    printWindow.document.write(`
+    const previewOverlay = document.createElement("div");
+    const previewToolbar = document.createElement("div");
+    const printButton = document.createElement("button");
+    const backButton = document.createElement("button");
+    const previewFrame = document.createElement("iframe");
+
+    previewOverlay.className = "print-preview-overlay";
+    previewOverlay.style.cssText = [
+        "position:fixed",
+        "inset:0",
+        "z-index:10000",
+        "display:flex",
+        "flex-direction:column",
+        "background:#f2f2f2"
+    ].join(";");
+
+    previewToolbar.style.cssText = [
+        "display:flex",
+        "flex-wrap:wrap",
+        "gap:10px",
+        "padding:12px",
+        "background:#101214",
+        "box-shadow:0 2px 8px rgba(0,0,0,.35)"
+    ].join(";");
+
+    printButton.type = "button";
+    printButton.textContent = "Print or Save PDF";
+    printButton.style.cssText = [
+        "min-height:46px",
+        "padding:0 18px",
+        "border:0",
+        "border-radius:10px",
+        "background:#ffb020",
+        "color:#101214",
+        "font:inherit",
+        "font-weight:800"
+    ].join(";");
+
+    backButton.type = "button";
+    backButton.textContent = "Back to Hé Guǐ";
+    backButton.style.cssText = [
+        "min-height:46px",
+        "padding:0 18px",
+        "border:1px solid #4b525a",
+        "border-radius:10px",
+        "background:#23282e",
+        "color:#fff",
+        "font:inherit",
+        "font-weight:800"
+    ].join(";");
+
+    previewFrame.title = "Roster print preview";
+    previewFrame.style.cssText = [
+        "width:100%",
+        "flex:1",
+        "border:0",
+        "background:#fff"
+    ].join(";");
+
+    printButton.addEventListener("click", () => {
+        previewFrame.contentWindow?.focus();
+        previewFrame.contentWindow?.print();
+    });
+
+    backButton.addEventListener("click", () => {
+        previewOverlay.remove();
+        document.body.style.overflow = "";
+    });
+
+    previewToolbar.append(printButton, backButton);
+    previewOverlay.append(previewToolbar, previewFrame);
+    document.body.appendChild(previewOverlay);
+    document.body.style.overflow = "hidden";
+
+    previewFrame.srcdoc = `
         <!DOCTYPE html>
         <html lang="en-AU">
         <head>
@@ -866,30 +940,6 @@ function printRosterGrid() {
                     padding: 16px;
                     color: #111;
                     font-family: Arial, sans-serif;
-                }
-
-                .print-actions {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 10px;
-                    margin-bottom: 18px;
-                }
-
-                .print-actions button {
-                    min-height: 46px;
-                    padding: 0 18px;
-                    border: 1px solid #555;
-                    border-radius: 10px;
-                    background: #ffffff;
-                    color: #111111;
-                    font: inherit;
-                    font-weight: 700;
-                    cursor: pointer;
-                }
-
-                .print-actions .print-button {
-                    border-color: #c17a00;
-                    background: #ffb020;
                 }
 
                 h1 {
@@ -971,31 +1021,11 @@ function printRosterGrid() {
                         padding: 0;
                     }
 
-                    .print-actions {
-                        display: none;
-                    }
                 }
             </style>
         </head>
 
         <body>
-            <div class="print-actions">
-                <button
-                    class="print-button"
-                    type="button"
-                    onclick="window.print()"
-                >
-                    Print or Save PDF
-                </button>
-
-                <button
-                    type="button"
-                    onclick="window.close()"
-                >
-                    Back to Hé Guǐ
-                </button>
-            </div>
-
             <h1>${escapeHtml(roster.name)}</h1>
 
             <div class="details">
@@ -1025,9 +1055,7 @@ function printRosterGrid() {
             </p>
         </body>
         </html>
-    `);
-
-    printWindow.document.close();
+    `;
 }
 
 function shiftClass(code) {
