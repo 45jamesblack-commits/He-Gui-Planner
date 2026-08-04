@@ -62,6 +62,8 @@ async function initialiseApp() {
     loadSavedInformation();
     renderProfileNavigation();
 
+    let rosterDataUpdated = false;
+
     try {
         const response = await fetch(
             `roster.csv?v=${Date.now()}`,
@@ -75,11 +77,18 @@ async function initialiseApp() {
         const csvText = await response.text();
         const rows = parseCsv(csvText);
 
-        rosters = convertRowsToRosters(rows);
+        const downloadedRosters = convertRowsToRosters(rows);
 
-        if (rosters.length === 0) {
+        if (downloadedRosters.length === 0) {
             throw new Error("No valid rosters were found.");
         }
+
+        rosterDataUpdated =
+            rosters.length > 0 &&
+            JSON.stringify(rosters) !==
+                JSON.stringify(downloadedRosters);
+
+        rosters = downloadedRosters;
 
         localStorage.setItem(
             STORAGE_DATA,
@@ -96,6 +105,17 @@ async function initialiseApp() {
 
     fillRosterList();
     showActiveProfile();
+
+    if (rosterDataUpdated) {
+        setTimeout(() => {
+            alert(
+                "Roster update installed.\n\n" +
+                "Your latest roster information is now ready. " +
+                "Your selected roster and starting number " +
+                "have not changed."
+            );
+        }, 100);
+    }
 }
 
 profileNameButton.addEventListener("click", renameActiveProfile);
