@@ -4,6 +4,8 @@ const STORAGE_DATA = "glacksRosterData";
 const STORAGE_SETUP = "glacksRosterSetup";
 const STORAGE_PROFILES = "heguiRosterProfiles";
 const STORAGE_ACTIVE_PROFILE = "heguiActiveProfile";
+const STORAGE_ACT_PUBLIC_HOLIDAYS =
+    "heguiShowActPublicHolidays";
 
 const DEFAULT_PROFILE_NAMES = [
     "He Gui",
@@ -16,6 +18,7 @@ let profiles = [];
 let activeProfileIndex = 0;
 let setup = null;
 let selectedDate = startOfDay(new Date());
+let showActPublicHolidays = true;
 
 const setupScreen = document.querySelector("#setup-screen");
 const homeScreen = document.querySelector("#home-screen");
@@ -29,6 +32,8 @@ const settingsPage = document.querySelector("#settings-page");
 const extrasPage = document.querySelector("#extras-page");
 const closeSettings = document.querySelector("#close-settings");
 const closeExtras = document.querySelector("#close-extras");
+const actPublicHolidaysCheckbox =
+    document.querySelector("#act-public-holidays-checkbox");
 const todayLabel = document.querySelector("#today-label");
 const todayDate = document.querySelector("#today-date");
 const publicHoliday = document.querySelector("#public-holiday");
@@ -56,6 +61,31 @@ extrasButton.addEventListener("click", () => {
 closeExtras.addEventListener("click", () => {
     extrasPage.classList.add("hidden");
 });
+
+const savedActPublicHolidayPreference =
+    localStorage.getItem(STORAGE_ACT_PUBLIC_HOLIDAYS);
+
+showActPublicHolidays =
+    savedActPublicHolidayPreference === null ||
+    savedActPublicHolidayPreference === "true";
+
+actPublicHolidaysCheckbox.checked =
+    showActPublicHolidays;
+
+actPublicHolidaysCheckbox.addEventListener("change", () => {
+    showActPublicHolidays =
+        actPublicHolidaysCheckbox.checked;
+
+    localStorage.setItem(
+        STORAGE_ACT_PUBLIC_HOLIDAYS,
+        String(showActPublicHolidays)
+    );
+
+    if (setup && rosters.length > 0) {
+        renderHome();
+    }
+});
+
 resetRosterButton.addEventListener("click", resetSetup);
 initialiseApp();
 
@@ -583,7 +613,9 @@ function renderHome() {
         year: "numeric"
     });
 
-    const holidayName = getActPublicHoliday(selectedDate);
+    const holidayName = showActPublicHolidays
+        ? getActPublicHoliday(selectedDate)
+        : "";
 
     if (holidayName) {
         publicHoliday.textContent =
@@ -641,7 +673,9 @@ function renderWeek() {
 });
         }
 
-        const holidayName = getActPublicHoliday(date);
+        const holidayName = showActPublicHolidays
+            ? getActPublicHoliday(date)
+            : "";
         const holidayMarkup = holidayName
             ? `<span class="week-day-holiday">${escapeHtml(holidayName)}</span>`
             : "";
