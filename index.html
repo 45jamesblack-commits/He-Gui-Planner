@@ -83,6 +83,11 @@
             <div class="today-heading">
                 <p id="today-label">Today</p>
                 <h2 id="today-date"></h2>
+                <div
+                    id="public-holiday"
+                    class="public-holiday hidden"
+                    aria-live="polite"
+                ></div>
             </div>
 
             <article class="shift-card">
@@ -173,13 +178,14 @@
             </p>
 
             <p>
-                Personal planning tool. Always confirm shifts
+                Unofficial personal planning tool. Always confirm shifts
                 using your employer’s official roster.
             </p>
         </footer>
 
     </main>
 
-    <script src="app.js?v=4"></script>
+    <script src="holidays.js?v=1"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

@@ -258,6 +258,20 @@ input:focus {
     font-size: clamp(1.2rem, 5vw, 1.7rem);
 }
 
+.public-holiday {
+    width: fit-content;
+    margin: 12px auto 0;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 187, 71, 0.55);
+    border-radius: 999px;
+    background: rgba(255, 187, 71, 0.12);
+    color: var(--amber);
+    font-size: 0.88rem;
+    font-weight: 850;
+    line-height: 1.25;
+    text-align: center;
+}
+
 .shift-card {
     position: relative;
     overflow: hidden;
@@ -331,8 +345,17 @@ input:focus {
 }
 
 .week-day-date {
+    display: grid;
+    gap: 4px;
     font-weight: 750;
     text-align: center;
+}
+
+.week-day-holiday {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 750;
+    line-height: 1.2;
 }
 
 .week-day-shift {
@@ -400,9 +423,9 @@ footer {
     }
 
     .navigation-buttons {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-}
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
 
     .profile-tab {
         min-height: 46px;

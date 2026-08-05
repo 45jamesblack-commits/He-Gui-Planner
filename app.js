@@ -31,6 +31,7 @@ const closeSettings = document.querySelector("#close-settings");
 const closeExtras = document.querySelector("#close-extras");
 const todayLabel = document.querySelector("#today-label");
 const todayDate = document.querySelector("#today-date");
+const publicHoliday = document.querySelector("#public-holiday");
 const shiftCode = document.querySelector("#shift-code");
 const shiftTime = document.querySelector("#shift-time");
 const rosterName = document.querySelector("#roster-name");
@@ -582,6 +583,17 @@ function renderHome() {
         year: "numeric"
     });
 
+    const holidayName = getActPublicHoliday(selectedDate);
+
+    if (holidayName) {
+        publicHoliday.textContent =
+            `ACT Public Holiday — ${holidayName}`;
+        publicHoliday.classList.remove("hidden");
+    } else {
+        publicHoliday.textContent = "";
+        publicHoliday.classList.add("hidden");
+    }
+
     shiftCode.textContent =
         friendlyCode(result.shift.code);
 
@@ -628,9 +640,16 @@ function renderWeek() {
     month: "short"
 });
         }
+
+        const holidayName = getActPublicHoliday(date);
+        const holidayMarkup = holidayName
+            ? `<span class="week-day-holiday">${escapeHtml(holidayName)}</span>`
+            : "";
+
         row.innerHTML = `
             <span class="week-day-date">
-                ${escapeHtml(label)}
+                <span>${escapeHtml(label)}</span>
+                ${holidayMarkup}
             </span>
 
             <span class="week-day-shift">
@@ -1136,6 +1155,10 @@ function dateKey(date) {
         String(date.getMonth() + 1).padStart(2, "0"),
         String(date.getDate()).padStart(2, "0")
     ].join("-");
+}
+
+function getActPublicHoliday(date) {
+    return window.ACT_PUBLIC_HOLIDAYS?.[dateKey(date)] || "";
 }
 
 function parseDateKey(value) {
