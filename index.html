@@ -18,21 +18,33 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
    
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=23">
 </head>
 
 <body>
+    <div id="startup-splash" class="startup-splash" role="status" aria-live="polite">
+        <div class="startup-splash-content">
+            <img src="hegui-logo.png" alt="Hé Guǐ Planner" class="startup-splash-logo">
+            <h1>Hé Guǐ</h1>
+            <p class="startup-splash-subtitle">Roster Planner</p>
+            <p class="startup-splash-disclaimer">
+                Personal roster planning tool. Always confirm official roster
+                and payroll information with your employer.
+            </p>
+        </div>
+    </div>
     <main class="app-shell">
 
-        <header class="app-header">
+        <header class="app-header compact-app-header">
     <img
-        src="hegui-logo.png"
-        alt="Hé Guǐ three roster paths logo"
-        class="app-logo"
+        src="hegui-icon-192.png"
+        alt="Hé Guǐ"
+        class="app-logo compact-app-logo"
     >
-
-    <h1>Hé Guǐ</h1>
-    <p class="subtitle">Roster Planner</p>
+    <div class="compact-app-title">
+        <h1>Hé Guǐ</h1>
+        <p class="subtitle">Roster Planner</p>
+    </div>
 </header>
 
         <nav id="profile-tabs" class="profile-tabs" aria-label="Roster profiles">
@@ -49,12 +61,22 @@
             <div class="card">
                 <p class="eyebrow">Initial setup</p>
 
-                <h2>Select your roster</h2>
+                <h2>Choose your planner</h2>
 
                 <p class="instructions">
-                    Choose your roster, then enter the roster number
-                    that represents today.
+                    Permanent rosters are listed first. Casual staff can
+                    choose Casual Shift Log and record shifts as they work.
                 </p>
+
+                <label for="planner-type">Employment type</label>
+
+                <select id="planner-type">
+                    <option value="fulltime">Permanent — Full-time</option>
+                    <option value="parttime">Permanent — Part-time</option>
+                    <option value="casual">Casual Shift Log</option>
+                </select>
+
+                <div id="permanent-setup-fields">
 
                 <label for="roster-select">Roster</label>
 
@@ -71,6 +93,11 @@
                     min="1"
                     placeholder="For example: 56"
                 >
+                <div id="part-time-hours-field" class="hidden">
+                    <label for="contract-hours">Contracted hours per week</label>
+                    <input id="contract-hours" type="number" min="1" max="37.99" step="0.25" placeholder="For example: 21">
+                </div>
+                </div>
 
                 <button id="check-setup" class="primary-button">
                     Start Planner
@@ -91,11 +118,36 @@
             </div>
 
             <article class="shift-card">
+                <span id="edited-dot" class="edited-dot hidden" aria-label="Times edited"></span>
                 <div id="shift-code" class="shift-code">—</div>
                 <div id="shift-time" class="shift-time"></div>
                 <div id="roster-name" class="roster-name"></div>
                 <div id="roster-position" class="roster-position"></div>
             </article>
+
+            <section id="pay-period-summary" class="pay-period-summary hidden">
+                <h3>Pay Fortnight</h3>
+                <p id="pay-period-dates"></p>
+                <p id="payday-date"></p>
+                <div id="pay-period-hours" class="pay-period-hours"></div>
+            </section>
+
+            <button id="add-edit-shift" class="primary-button hidden">
+                Add Shift
+            </button>
+            <button id="edit-shifts-list" class="secondary-button full-width hidden">
+                Edit Shifts
+            </button>
+
+            <div id="roster-action-buttons" class="roster-action-buttons hidden">
+                <button id="add-change-application" class="primary-button full-width">
+                    Add Change / Application
+                </button>
+            </div>
+
+            <button id="delete-shift" class="secondary-button full-width hidden">
+                Delete Shift
+            </button>
 
             <div class="navigation-buttons">
                 <button id="previous-day" class="secondary-button">
@@ -111,6 +163,10 @@
                 <h2>Next 7 Days</h2>
                 <div id="week-list" class="week-list"></div>
             </section>
+
+            <button id="current-month" class="secondary-button full-width">
+                Current Month
+            </button>
 
             <button id="lookup-date" class="primary-button">
                 Look Up Date
@@ -133,6 +189,10 @@
 
     <p>Accessibility</p>
     <p>Display</p>
+    <label class="settings-toggle">
+        <input id="show-startup-splash" type="checkbox" checked>
+        <span>Show startup screen</span>
+    </label>
     <p>Profiles</p>
     <p>Roster</p>
  
@@ -145,15 +205,172 @@
 
     <p><strong>Hé Guǐ Planner</strong></p>
 
-    <p>Version 1.0 Beta 2</p>
+    <p>Version 1.0 Beta 23 Test</p>
 
     <p>Created by</p>
 
     <p>James &amp; Gideon</p>
 
+    <p class="settings-disclaimer">
+        Personal roster planning tool. Always confirm official roster and
+        payroll information with your employer.
+    </p>
+
     <button id="close-settings" class="primary-button">
         Close
     </button>
+</section>
+
+
+<section id="change-action-page" class="modal-page hidden">
+    <h2>Add Change / Application</h2>
+    <p class="instructions">
+        Choose what you want to add. You do not need to select a roster day first.
+    </p>
+
+    <div class="change-choice-list">
+        <button id="choose-leave" class="primary-button full-width">Leave</button>
+        <button id="choose-individual-swap" class="secondary-button full-width">Individual Swap</button>
+        <button id="choose-colleague-swap" class="secondary-button full-width">Colleague Swap</button>
+        <button id="choose-extra-hours" class="secondary-button full-width">Extra Hours / Overtime</button>
+        <button id="choose-management-change" class="secondary-button full-width">Management Roster Change</button>
+        <div class="change-remove-group">
+            <button id="remove-leave" class="text-button full-width">Deselect Leave</button>
+            <button id="delete-swap-global" class="text-button full-width">Delete Swap</button>
+            <button id="delete-added-shift-global" class="text-button full-width">Delete Added Shift</button>
+            <button id="delete-management-global" class="text-button full-width">Delete Management Change</button>
+        </div>
+    </div>
+
+    <button id="close-change-action" class="text-button full-width">Cancel</button>
+</section>
+
+<section id="leave-type-page" class="modal-page hidden">
+    <h2>Add Leave</h2>
+    <p class="instructions">
+        Choose the leave type first. The calendar will then let you choose any start and finish dates.
+    </p>
+
+    <div class="change-choice-list">
+        <button class="leave-type-choice primary-button full-width" data-leave-type="annual_leave">Annual Leave</button>
+        <button class="leave-type-choice secondary-button full-width" data-leave-type="personal_leave">Personal Leave</button>
+        <button class="leave-type-choice secondary-button full-width" data-leave-type="long_service_leave">Long Service Leave</button>
+        <button class="leave-type-choice secondary-button full-width" data-leave-type="other_leave">Other Leave</button>
+    </div>
+
+    <button id="back-from-leave-type" class="text-button full-width">Back</button>
+</section>
+
+<section id="permanent-change-page" class="modal-page hidden">
+    <h2>Record Roster Change</h2>
+    <div class="change-date-editor">
+        <p id="permanent-change-date" class="instructions"></p>
+        <button id="edit-change-dates" class="secondary-button compact-button" type="button">Edit Dates</button>
+    </div>
+    <label for="permanent-change-type" class="hidden">Change type</label>
+    <select id="permanent-change-type" class="hidden">
+        <option value="add_shift">Casual / Extra Hours</option>
+        <option value="leave">Leave</option>
+        <option value="swap">Swap</option>
+        <option value="roster_change">Management Roster Change</option>
+    </select>
+    <div id="leave-type-field" class="hidden">
+        <label for="leave-type">Leave type</label>
+        <select id="leave-type"><option value="personal_leave">Personal leave</option><option value="annual_leave">Annual leave</option><option value="long_service_leave">Long service leave</option><option value="other_leave">Other leave</option></select>
+    </div>
+    <div id="swap-type-field" class="hidden">
+        <label for="swap-type">Swap type</label>
+        <select id="swap-type"><option value="individual">Individual</option><option value="colleague">Colleague</option></select>
+    </div>
+    <div id="permanent-shift-fields">
+        <label for="permanent-shift-code">New shift</label>
+        <select id="permanent-shift-code"><option value="">Choose a shift</option></select>
+        <div class="time-fields">
+            <div><label for="permanent-start-time">Start</label><input id="permanent-start-time" type="time"></div>
+            <div><label for="permanent-finish-time">Finish</label><input id="permanent-finish-time" type="time"></div>
+        </div>
+        <label class="break-option" for="permanent-break"><input id="permanent-break" type="checkbox"><span>Unpaid break — 30 minutes</span></label>
+    </div>
+    <div id="swap-date-field" class="hidden">
+        <p id="change-date-summary" class="date-choice-summary"></p>
+        <input id="swap-day-off-date" type="hidden">
+    </div>
+    <label for="permanent-change-notes">Notes (optional)</label>
+    <textarea id="permanent-change-notes" rows="3" maxlength="300"></textarea>
+    <button id="save-permanent-change" class="primary-button">Save Change</button>
+    <button id="cancel-permanent-change" class="secondary-button full-width">Cancel</button>
+</section>
+
+
+<section id="delete-record-page" class="modal-page hidden">
+    <h2 id="delete-record-title">Delete Change</h2>
+    <p class="instructions">Choose the record you want to remove.</p>
+    <div id="delete-record-list" class="change-choice-list"></div>
+    <button id="close-delete-record" class="text-button full-width">Back</button>
+</section>
+
+<section id="roster-calendar-page" class="modal-page hidden">
+    <h2 id="roster-calendar-title">Choose Date</h2>
+    <p id="roster-calendar-instructions" class="instructions"></p>
+
+    <div class="roster-calendar-card">
+        <div class="roster-calendar-head">
+            <button id="calendar-prev" class="calendar-nav" type="button" aria-label="Previous month">‹</button>
+            <strong id="calendar-month"></strong>
+            <button id="calendar-next" class="calendar-nav" type="button" aria-label="Next month">›</button>
+        </div>
+        <div class="roster-calendar-weekdays">
+            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+        </div>
+        <div id="roster-calendar-grid" class="roster-calendar-grid"></div>
+    </div>
+
+    <div id="calendar-selection-summary" class="date-choice-summary">No date selected.</div>
+
+    <div class="calendar-actions">
+        <button id="calendar-cancel" class="secondary-button">Cancel</button>
+        <button id="calendar-ok" class="primary-button" disabled>OK</button>
+    </div>
+</section>
+
+<section id="casual-shift-page" class="modal-page hidden">
+    <h2 id="casual-shift-title">Add Casual Shift</h2>
+    <p id="casual-shift-date" class="instructions"></p>
+
+    <label for="casual-shift-code">Shift code</label>
+    <select id="casual-shift-code" required>
+        <option value="">Choose a shift</option>
+    </select>
+
+    <div class="time-fields">
+        <div>
+            <label for="casual-start-time">Start time</label>
+            <input id="casual-start-time" type="time" required>
+        </div>
+        <div>
+            <label for="casual-finish-time">Finish time</label>
+            <input id="casual-finish-time" type="time" required>
+        </div>
+    </div>
+
+    <label class="break-option" for="casual-break">
+        <input id="casual-break" type="checkbox">
+        <span>Unpaid break — 30 minutes</span>
+    </label>
+
+    <div id="casual-paid-hours" class="paid-hours" aria-live="polite">
+        Paid hours: —
+    </div>
+
+    <label for="casual-area">Work area (optional)</label>
+    <input id="casual-area" type="text" maxlength="60">
+
+    <label for="casual-notes">Notes (optional)</label>
+    <textarea id="casual-notes" rows="4" maxlength="300"></textarea>
+
+    <button id="save-casual-shift" class="primary-button">Save Shift</button>
+    <button id="delete-casual-editor" class="secondary-button full-width hidden">Delete Shift</button>
+    <button id="cancel-casual-shift" class="secondary-button full-width">Cancel</button>
 </section>
 
 <section id="extras-page" class="modal-page hidden">
@@ -168,7 +385,24 @@
         ACT Public Holidays
     </label><br>
     <label><input type="checkbox"> NSW Public Holidays</label><br>
-    <label><input type="checkbox"> ACT School Holidays</label><br>
+    <label class="extra-option-card">
+        <img
+            class="extra-option-preview"
+            src="school-holidays-icon.png"
+            alt="Children playing backyard cricket during the school holidays"
+        >
+        <span class="extra-option-copy">
+            <span class="extra-option-title">ACT School Holidays</span>
+            <span class="extra-option-description">
+                Show school-holiday dates and the picture in your 7-day roster.
+            </span>
+        </span>
+        <input
+            id="act-school-holidays-checkbox"
+            type="checkbox"
+            aria-label="Show ACT school holidays"
+        >
+    </label>
     <label><input type="checkbox"> NSW School Holidays</label><br>
     <label><input type="checkbox"> Notifications</label><br>
     <label><input type="checkbox"> Google Calendar</label>
@@ -184,15 +418,11 @@
                 Authors: James Gideon
             </p>
 
-            <p>
-                Unofficial personal planning tool. Always confirm shifts
-                using your employer’s official roster.
-            </p>
         </footer>
 
     </main>
 
     <script src="holidays.js?v=1"></script>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=23"></script>
 </body>
 </html>

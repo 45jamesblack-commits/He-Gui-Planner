@@ -42,7 +42,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
     font: inherit;
 }
 
@@ -59,7 +60,7 @@ button {
     object-position: center;
 }
 .app-shell {
-    width: min(100%, 720px);
+    width: min(100%, 480px);
     min-height: 100vh;
     margin: 0 auto;
     padding:
@@ -190,9 +191,9 @@ label {
 }
 
 select,
-input {
+input,
+textarea {
     width: 100%;
-    min-height: 58px;
     padding: 0 16px;
     border: 1px solid var(--border);
     border-radius: 14px;
@@ -201,10 +202,69 @@ input {
     color: var(--text);
 }
 
+select,
+input {
+    min-height: 58px;
+}
+
+textarea {
+    min-height: 110px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    resize: vertical;
+}
+
 select:focus,
-input:focus {
+input:focus,
+textarea:focus {
     border-color: var(--amber);
     box-shadow: 0 0 0 3px rgba(255, 176, 32, 0.2);
+}
+
+.extra-option-card {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    margin: 18px 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--card);
+    cursor: pointer;
+}
+
+.extra-option-preview {
+    width: 92px;
+    height: 92px;
+    border-radius: 14px;
+    object-fit: cover;
+}
+
+.extra-option-copy {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.extra-option-title {
+    color: var(--text);
+    font-weight: 850;
+}
+
+.extra-option-description {
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.extra-option-card input {
+    width: 26px;
+    min-height: 26px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--amber);
 }
 
 .primary-button,
@@ -346,15 +406,143 @@ input:focus {
 
 .week-day-date {
     display: grid;
-    gap: 4px;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
     font-weight: 750;
     text-align: center;
+}
+
+.edited-dot {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffd2d2;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.16);
+}
+
+.edited-shift .week-day-shift {
+    color: var(--danger);
+}
+
+.time-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.break-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
+}
+
+.break-option input {
+    width: 26px;
+    min-height: 26px;
+    margin: 0;
+    accent-color: var(--amber);
+}
+
+.paid-hours {
+    margin-top: 12px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(255, 176, 32, 0.12);
+    color: var(--amber-light);
+    font-size: 1.1rem;
+    font-weight: 850;
+    text-align: center;
+}
+
+.pay-period-summary {
+    margin-top: 16px;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--card);
+    text-align: center;
+}
+
+.pay-period-summary h3,
+.pay-period-summary p {
+    margin: 0 0 7px;
+}
+
+.pay-period-hours {
+    margin-top: 12px;
+    color: var(--amber-light);
+    font-size: 1.15rem;
+    font-weight: 900;
+}
+
+.modal-page {
+    position: fixed;
+    z-index: 20;
+    inset: 0;
+    overflow-y: auto;
+    padding: max(28px, env(safe-area-inset-top)) 20px 40px;
+    background: var(--background);
+}
+
+@media (min-width: 481px) {
+    .modal-page {
+        right: auto;
+        left: 50%;
+        width: 480px;
+        transform: translateX(-50%);
+        border-right: 1px solid var(--border);
+        border-left: 1px solid var(--border);
+    }
+}
+
+.modal-page > * {
+    width: min(100%, 680px);
+    margin-right: auto;
+    margin-left: auto;
+}
+
+.school-holiday-icon-slot {
+    display: flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+}
+
+.school-holiday-icon {
+    display: block;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.week-day-date-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
 }
 
 .week-day-holiday {
     color: var(--muted);
     font-size: 0.72rem;
     font-weight: 750;
+    line-height: 1.2;
+}
+
+.week-day-school-holiday {
+    color: var(--amber);
+    font-size: 0.72rem;
+    font-weight: 800;
     line-height: 1.2;
 }
 
@@ -388,6 +576,22 @@ footer {
 }
 
 @media (max-width: 420px) {
+    .extra-option-card {
+        grid-template-columns: 78px minmax(0, 1fr) auto;
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .extra-option-preview {
+        width: 78px;
+        height: 78px;
+        border-radius: 12px;
+    }
+
+    .extra-option-description {
+        font-size: 0.78rem;
+    }
+
         .shift-card {
         padding: 20px 16px;
     }
@@ -456,4 +660,317 @@ footer {
     footer {
         display: none !important;
     }
+}
+
+
+/* Beta 7 shared roster calendar and action controls */
+.roster-action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.roster-action-buttons .primary-button {
+    min-height: 58px;
+    margin: 0;
+    padding: 10px;
+    line-height: 1.2;
+}
+
+.roster-calendar-card {
+    margin-top: 16px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--card);
+}
+
+.roster-calendar-head {
+    display: grid;
+    grid-template-columns: 42px 1fr 42px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.calendar-nav {
+    width: 42px;
+    min-height: 40px;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card-soft, #25292e);
+    color: inherit;
+    font-size: 1.45rem;
+}
+
+.roster-calendar-weekdays,
+.roster-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.roster-calendar-weekdays {
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.roster-calendar-day {
+    min-width: 0;
+    min-height: 54px;
+    margin: 0;
+    padding: 4px 2px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--card);
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+
+/* Beta 17: subtle alternating actual pay-fortnight bands.
+   Keep the dark theme; every second fortnight is only slightly lighter.
+   Leave/change colours below override these neutral shades. */
+.roster-calendar-day.pay-fortnight-light {
+    background: var(--card);
+}
+
+.roster-calendar-day.pay-fortnight-dark {
+    background: #2a3b22;
+}
+
+/* Beta 21: current pay fortnight gets a gentle lime-green cue. */
+.roster-calendar-day.pay-fortnight-active {
+    background: #47d1fc;
+    box-shadow: inset 0 0 0 1px rgba(170,255,80,.08);
+}
+
+.roster-calendar-day.blank { visibility: hidden; }
+.roster-calendar-day.selected { outline: 3px solid var(--amber); outline-offset: 1px; }
+.roster-calendar-day.in-range { box-shadow: inset 0 0 0 999px rgba(255,176,32,.12); }
+.calendar-date-number { font-weight: 900; }
+.calendar-roster-code { margin-top: 3px; font-size: .72rem; font-weight: 900; }
+
+.roster-calendar-day.calendar-yellow { background: hsl(59, 89%, 72%); color: #1d1d1d; }
+.roster-calendar-day.calendar-pink { background: #ec3886; color: #1d1d1d; }
+.roster-calendar-day.calendar-blue { background: #5b80fc; color: #1d1d1d; }
+.roster-calendar-day.calendar-green { background: #70fa87; color: #1d1d1d; }
+
+.date-choice-summary {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    text-align: center;
+    line-height: 1.45;
+}
+
+.calendar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.calendar-actions button { margin: 0; }
+
+.pay-period-hours {
+    display: grid;
+    gap: 7px;
+    text-align: left;
+}
+
+.pay-period-hours span {
+    display: block;
+}
+
+@media (max-width: 380px) {
+    .roster-action-buttons { grid-template-columns: 1fr; }
+    .roster-calendar-weekdays,
+    .roster-calendar-grid { gap: 4px; }
+    .roster-calendar-day { min-height: 50px; }
+}
+
+
+/* Beta 11: start changes from an action, not from the currently displayed roster day */
+.change-choice-list {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0;
+}
+
+.change-choice-list button {
+    margin: 0;
+}
+
+#add-change-application {
+    min-height: 54px;
+    font-size: 1rem;
+}
+
+.roster-action-buttons {
+    grid-template-columns: 1fr;
+}
+
+
+/* Beta 12: all change/application dates are edited through the roster calendar */
+.change-date-editor {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.change-date-editor .instructions { margin: 0; }
+.compact-button {
+    width: auto;
+    min-height: 42px;
+    margin: 0;
+    padding: 8px 12px;
+}
+@media (max-width: 420px) {
+    .change-date-editor { grid-template-columns: 1fr; }
+    .compact-button { width: 100%; }
+}
+
+/* Beta 20 - changed roster items and quick delete lists */
+.roster-calendar-day.calendar-altered .calendar-roster-code,
+.roster-calendar-day .calendar-roster-code.altered-code { color:#ff5a5f; }
+.roster-calendar-day .calendar-roster-code.multi-code { color:#ff5a5f; line-height:1.05; }
+.change-remove-group { margin-top:12px; padding-top:10px; border-top:1px solid var(--border, #46505a); }
+.delete-record-item { text-align:left; height:auto; min-height:48px; padding:10px 12px; }
+button.action-locked { opacity:.45; cursor:not-allowed; }
+
+/* Beta 21 swap display */
+.roster-calendar-day .calendar-roster-code.swap-original {
+    color: #aeb5bb;
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+    line-height: 1.05;
+}
+.roster-calendar-day .calendar-roster-code.swap-new {
+    color: #ff5a5f;
+    line-height: 1.05;
+}
+
+.pay-hours-warning { color: #ffcf66; font-size: .9em; }
+
+
+/* Beta 23: startup splash + compact in-app header */
+.startup-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 22px;
+    background:
+        radial-gradient(circle at top, #20252a 0%, var(--background) 48%);
+    opacity: 1;
+    transition: opacity 280ms ease;
+}
+
+.startup-splash.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.startup-splash.hidden {
+    display: none;
+}
+
+.startup-splash-content {
+    width: min(100%, 440px);
+    text-align: center;
+}
+
+.startup-splash-logo {
+    display: block;
+    width: min(100%, 400px);
+    margin: 0 auto 20px;
+    border-radius: 16px;
+}
+
+.startup-splash h1 {
+    margin: 0;
+    font-size: clamp(2.5rem, 12vw, 4.2rem);
+    letter-spacing: -0.04em;
+}
+
+.startup-splash-subtitle {
+    margin: 8px 0 30px;
+    color: var(--muted);
+    font-size: 1.08rem;
+}
+
+.startup-splash-disclaimer {
+    max-width: 390px;
+    margin: 0 auto;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.compact-app-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+    text-align: left;
+}
+
+.compact-app-logo {
+    width: 46px;
+    height: 46px;
+    aspect-ratio: 1 / 1;
+    margin: 0;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.compact-app-title h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.compact-app-title .subtitle {
+    margin: 2px 0 0;
+    font-size: 0.78rem;
+}
+
+.settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+}
+
+.settings-toggle input {
+    width: 20px;
+    height: 20px;
+}
+
+.settings-disclaimer {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
 }
