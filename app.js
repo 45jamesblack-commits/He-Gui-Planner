@@ -37,8 +37,6 @@ const rosterSelect = document.querySelector("#roster-select");
 const rosterDayInput = document.querySelector("#roster-day");
 const plannerType = document.querySelector("#planner-type");
 const permanentSetupFields = document.querySelector("#permanent-setup-fields");
-const partTimeHoursField = document.querySelector("#part-time-hours-field");
-const contractHours = document.querySelector("#contract-hours");
 const profileTabs = document.querySelector("#profile-tabs");
 const profileNameButton = document.querySelector("#profile-name-button");
 const settingsButton = document.querySelector("#settings-button");
@@ -118,6 +116,8 @@ const permanentFinishTime = document.querySelector("#permanent-finish-time");
 const permanentBreak = document.querySelector("#permanent-break");
 const swapDateField = document.querySelector("#swap-date-field");
 const swapDayOffDate = document.querySelector("#swap-day-off-date");
+const calendarSameDayOption = document.querySelector("#calendar-same-day-option");
+const calendarSameDaySwap = document.querySelector("#calendar-same-day-swap");
 const permanentChangeNotes = document.querySelector("#permanent-change-notes");
 
 const resetRosterButton =
@@ -210,11 +210,13 @@ chooseLeaveButton.addEventListener("click", () => {
 });
 chooseIndividualSwapButton.addEventListener("click", () => {
     pendingSwapType = "individual";
+    calendarSameDaySwap.checked = false;
     changeActionPage.classList.add("hidden");
     openRosterCalendar("swap");
 });
 chooseColleagueSwapButton.addEventListener("click", () => {
     pendingSwapType = "colleague";
+    calendarSameDaySwap.checked = false;
     changeActionPage.classList.add("hidden");
     openRosterCalendar("swap");
 });
@@ -253,11 +255,18 @@ document.querySelectorAll(".leave-type-choice").forEach((button) => {
         openRosterCalendar("leave");
     });
 });
-currentMonthButton.addEventListener("click", () => openRosterCalendar("month_view"));
+currentMonthButton.addEventListener("click", () => {
+  logHeguiEvent("calendar_open", {
+    action: "month_view"
+  });
+
+  openRosterCalendar("month_view");
+});
 document.querySelector("#calendar-prev").addEventListener("click", () => moveRosterCalendarMonth(-1));
 document.querySelector("#calendar-next").addEventListener("click", () => moveRosterCalendarMonth(1));
 document.querySelector("#calendar-cancel").addEventListener("click", closeRosterCalendar);
 calendarOk.addEventListener("click", confirmRosterCalendar);
+calendarSameDaySwap.addEventListener("change", () => { pendingCalendarDates = []; renderRosterCalendar(); });
 permanentChangeType.addEventListener("change", updatePermanentChangeFields);
 swapType.addEventListener("change", updatePermanentChangeFields);
 permanentShiftCode.addEventListener("change", fillPermanentShiftTimes);
@@ -534,7 +543,6 @@ function switchProfile(index) {
         : setup?.employmentType === "parttime"
             ? "parttime"
             : "fulltime";
-    contractHours.value = setup?.contractedWeeklyHours || "";
     rosterSelect.value = setup && setup.type !== "casual"
         ? String(setup.rosterIndex)
         : "";
@@ -587,7 +595,6 @@ function showActiveProfile() {
 function updateSetupFields() {
     const casualSelected = plannerType.value === "casual";
     permanentSetupFields.classList.toggle("hidden", casualSelected);
-    partTimeHoursField.classList.toggle("hidden", plannerType.value !== "parttime");
 }
 
 function showCsvLoader() {
@@ -826,14 +833,14 @@ function beginSetupCheck() {
 
     const anchorDate = startOfDay(new Date());
 
-    const weeklyHours = plannerType.value === "parttime"
-        ? Number(contractHours.value)
+    // Part-time hours are derived from the selected roster cycle;
+    // the user does not need to type or validate them during setup.
+    const derivedFortnightMinutes = plannerType.value === "parttime"
+        ? calculateRosterCycleFortnightMinutes({ type: "roster", rosterIndex })
+        : 76 * 60;
+    const weeklyHours = derivedFortnightMinutes > 0
+        ? derivedFortnightMinutes / 120
         : 38;
-
-    if (plannerType.value === "parttime" && (!weeklyHours || weeklyHours >= 38)) {
-        alert("Enter this part-time roster’s contracted weekly hours below 38.");
-        return;
-    }
 
     const proposedSetup = {
         type: "roster",
@@ -847,7 +854,15 @@ function beginSetupCheck() {
     setup = proposedSetup;
     profiles[activeProfileIndex].setup = setup;
     saveProfiles();
-
+logHeguiEvent("roster_selected", {
+  roster: roster.name,
+  action: "setup_saved",
+  details: {
+    roster_index: rosterIndex,
+    anchor_position: anchorPosition,
+    employment_type: plannerType.value
+  }
+});
     selectedDate = anchorDate;
 
     showHomeScreen();
@@ -916,16 +931,26 @@ function renderHome() {
         ? permanentDisplayShift(change, result.shift)
         : result.shift;
 
-    shiftCode.textContent = friendlyCode(displayedShift.code);
+    const topAddedShifts = getAddedShifts(selectedDate).slice(0, 2);
+    const topLines = [];
+    if (change?.type === "swap_worked" && (change.sameDay || change.preserveOriginal)) {
+        topLines.push(`<span class="top-shift-line ${change.sameDay ? "swap-original" : ""}">${escapeHtml(friendlyCode(result.shift.code))}</span>`);
+        topLines.push(`<span class="top-shift-line added-shift">${escapeHtml(friendlyCode(displayedShift.code))}</span>`);
+    } else {
+        topLines.push(`<span class="top-shift-line">${escapeHtml(friendlyCode(displayedShift.code))}</span>`);
+    }
+    topAddedShifts.forEach((entry) => topLines.push(`<span class="top-shift-line added-shift">${escapeHtml(entry.code)}</span>`));
+    shiftCode.innerHTML = topLines.slice(0, 3).join("");
 
-    shiftTime.textContent =
-        friendlyTime(displayedShift);
+    const topTimes = [friendlyTime(displayedShift), ...topAddedShifts.map((entry) => `${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`)];
+    shiftTime.innerHTML = topTimes.slice(0, 3).map((time, index) => `<span class="top-time-line ${index > 0 ? "added-shift" : ""}">${escapeHtml(time)}</span>`).join("");
 
     rosterName.textContent = roster.name;
 
     rosterPosition.textContent = change
         ? `${changeLabel(change.type)} · Original: ${displayShift(result.shift)}`
         : `Roster number ${result.position} of ${roster.shifts.length}`;
+    rosterPosition.classList.toggle("roster-position-corner", !change);
     editedDot.classList.toggle("hidden", !change);
     renderPayPeriodSummary();
 
@@ -1068,13 +1093,21 @@ function renderWeek() {
             ? `<span class="week-day-school-holiday">${escapeHtml(schoolHolidayName)}</span>`
             : "";
 
-        const shiftDisplay = setup?.type === "casual"
+        const addedShifts = setup?.type === "roster" ? getAddedShifts(date).slice(0, 2) : [];
+        const baseShiftDisplay = setup?.type === "casual"
             ? casualEntry
                 ? `${casualEntry.timesEdited ? "● " : ""}${casualEntry.code} · ${formatClockTime(casualEntry.start)}–${formatClockTime(casualEntry.finish)}`
                 : "No shift"
             : permanentChange
-                ? `● ${displayShift(permanentDisplayShift(permanentChange, result.shift))}`
+                ? displayShift(permanentDisplayShift(permanentChange, result.shift))
                 : displayShift(result.shift);
+        let shiftMarkup = escapeHtml(baseShiftDisplay);
+        if (permanentChange?.type === "swap_worked" && (permanentChange.sameDay || permanentChange.preserveOriginal)) {
+            shiftMarkup = `<span class="week-shift-original ${permanentChange.sameDay ? "swap-original" : ""}">${escapeHtml(displayShift(result.shift))}</span><span class="week-shift-added">${escapeHtml(displayShift(permanentDisplayShift(permanentChange, result.shift)))}</span>`;
+        }
+        if (addedShifts.length) {
+            shiftMarkup += addedShifts.map((entry) => `<span class="week-shift-added">${escapeHtml(`${entry.code} · ${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`)}</span>`).join("");
+        }
 
         if (casualEntry?.timesEdited) {
             row.classList.add("edited-shift");
@@ -1096,7 +1129,7 @@ function renderWeek() {
             </span>
 
             <span class="week-day-shift">
-                ${escapeHtml(shiftDisplay)}
+                ${shiftMarkup}
             </span>
         `;
 
@@ -1347,19 +1380,19 @@ function openRosterCalendar(action) {
         ],
         swap: [
             pendingSwapType === "colleague" ? "Colleague Swap" : "Individual Swap",
-            setup?.employmentType === "parttime"
-                ? "Choose one working day for a same-day shift swap, or choose two dates for a linked swap. Part-time swaps are not restricted to RDO/ADO days; hours must match and worked shifts must not overlap."
-                : (pendingSwapType === "individual"
-                    ? "For a same-day swap, choose one working day. For a two-day swap, choose the RDO/ADO you will work, then the original working day that becomes your replacement RDO."
-                    : "For a same-day swap, choose one working day. For a two-day swap, choose the original working day, then the RDO/ADO that becomes your working day.")
+            calendarSameDaySwap.checked
+                ? "Choose one working day. You will then choose a replacement shift with exactly the same paid hours."
+                : "Choose the two swap dates in either order. Hé Guǐ will identify the working and off days automatically. Swap hours must match and worked shifts must not overlap."
         ],
         add_shift: [setup.type === "casual" ? "Add Casual Shift" : (setup.employmentType === "fulltime" ? "Add Overtime Shift" : "Add Extra Hours"), "Choose one date."],
         roster_change: ["Management Roster Change", "First tap the original working day. Then tap the original RDO. Management changes are only available on No ADO rosters."],
         lookup: ["Choose Date", "Choose one date to view."],
-        month_view: ["Current Month", "Tap any date to make it the selected day. The calendar shows your roster and recorded changes."]
+        month_view: ["Current Month", "Select a date and press OK to move the 7-day roster to that date. Your current pay fortnight is highlighted in light blue."]
     }[action];
     rosterCalendarTitle.textContent = config[0];
     rosterCalendarInstructions.textContent = config[1];
+    calendarSameDayOption.classList.toggle("hidden", action !== "swap");
+    if (action !== "swap") calendarSameDaySwap.checked = false;
     rosterCalendarPage.classList.remove("hidden");
     renderRosterCalendar();
 }
@@ -1470,11 +1503,28 @@ function renderRosterCalendar() {
         } else if (change?.type === "swap_off") {
             button.innerHTML = `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "—")}</span><span class="calendar-roster-code swap-new">${escapeHtml(change.code || "O")}</span>`;
         } else if (visibleCodes.length >= 2) {
-            button.innerHTML = `<span class="calendar-roster-code multi-code">${visibleCodes.map(escapeHtml).join("<br>")}</span>`;
+            button.innerHTML = `<span class="calendar-date-number">${day}</span><span class="calendar-roster-code">${escapeHtml(visibleCodes[0])}</span>${visibleCodes.slice(1,3).map((value) => `<span class="calendar-roster-code altered-code">${escapeHtml(value)}</span>`).join("")}`;
         } else if (addedCodes.length) {
             button.innerHTML = `<span class="calendar-date-number">${day}</span><span class="calendar-roster-code altered-code">${escapeHtml(addedCodes[0])}</span>`;
         } else {
             button.innerHTML = `<span class="calendar-date-number">${day}</span><span class="calendar-roster-code">${escapeHtml(code || "—")}</span>`;
+        }
+        const calendarSchoolHoliday = showActSchoolHolidays ? getActSchoolHoliday(date) : "";
+        const calendarPublicHoliday = showActPublicHolidays ? getActPublicHoliday(date) : "";
+        if (calendarSchoolHoliday) {
+            const icon = document.createElement("img");
+            icon.className = "calendar-school-holiday-icon";
+            icon.src = "school-holidays-icon.png";
+            icon.alt = "";
+            icon.title = calendarSchoolHoliday;
+            button.appendChild(icon);
+        }
+        if (calendarPublicHoliday) {
+            const marker = document.createElement("span");
+            marker.className = "calendar-public-holiday-marker";
+            marker.textContent = "PH";
+            marker.title = calendarPublicHoliday;
+            button.appendChild(marker);
         }
         button.addEventListener("click", () => chooseRosterCalendarDate(date));
         rosterCalendarGrid.appendChild(button);
@@ -1501,39 +1551,22 @@ function chooseRosterCalendarDate(date) {
             pendingCalendarDates.push(startOfDay(date));
         }
     } else if (action === "swap") {
-        if (pendingCalendarDates.length === 0) {
-            // One selected working day can be saved as a same-day shift swap.
-            // Part-time staff may also start a two-date swap from any day.
-            if (!partTime && pendingSwapType === "colleague" && isOff) {
-                alert("Choose the original working day first.");
+        if (calendarSameDaySwap.checked) {
+            if (isOff) {
+                alert("A same-day swap must use an original working day.");
                 return;
             }
             pendingCalendarDates = [startOfDay(date)];
-        } else if (pendingCalendarDates.length === 1) {
-            const first = pendingCalendarDates[0];
-            if (dateKey(first) === dateKey(date)) {
-                // Keep a single date: this is the same-day swap path.
-                renderRosterCalendar();
-                return;
-            }
-            if (!partTime) {
-                const firstCode = String(getShiftForDate(first).shift.code || "").toUpperCase();
-                const firstOff = ["O", "A"].includes(firstCode);
-                if (pendingSwapType === "individual") {
-                    if (!firstOff || isOff) {
-                        alert("For a two-day full-time Individual Swap, first choose the RDO/ADO you will work, then the original working day that becomes your replacement RDO.");
-                        return;
-                    }
-                } else {
-                    if (firstOff || !isOff) {
-                        alert("For a two-day full-time Colleague Swap, first choose the original working day, then the RDO/ADO that becomes your working day.");
-                        return;
-                    }
-                }
-            }
-            pendingCalendarDates.push(startOfDay(date));
         } else {
-            pendingCalendarDates = [startOfDay(date)];
+            const key = dateKey(date);
+            const existingIndex = pendingCalendarDates.findIndex((picked) => dateKey(picked) === key);
+            if (existingIndex >= 0) {
+                pendingCalendarDates.splice(existingIndex, 1);
+            } else if (pendingCalendarDates.length >= 2) {
+                pendingCalendarDates = [startOfDay(date)];
+            } else {
+                pendingCalendarDates.push(startOfDay(date));
+            }
         }
     } else if (action === "roster_change") {
         if (pendingCalendarDates.length === 0) {
@@ -1556,7 +1589,7 @@ function chooseRosterCalendarDate(date) {
 
 function updateRosterCalendarSummary() {
     const dates = pendingCalendarDates;
-    calendarOk.disabled = dates.length === 0 || (pendingChangeAction === "roster_change" && dates.length !== 2) || (pendingChangeAction === "swap" && ![1,2].includes(dates.length));
+    calendarOk.disabled = dates.length === 0 || (pendingChangeAction === "roster_change" && dates.length !== 2) || (pendingChangeAction === "swap" && (calendarSameDaySwap.checked ? dates.length !== 1 : dates.length !== 2));
     if (!dates.length) {
         calendarSelectionSummary.textContent = "No date selected.";
         return;
@@ -1567,7 +1600,7 @@ function updateRosterCalendarSummary() {
         return;
     }
     if (["swap", "roster_change"].includes(pendingChangeAction)) {
-        if (pendingChangeAction === "swap" && dates.length === 1) {
+        if (pendingChangeAction === "swap" && calendarSameDaySwap.checked && dates.length === 1) {
             calendarSelectionSummary.innerHTML = `<strong>Same-day swap:</strong> ${formatAustralianDate(dates[0])}`;
         } else if (pendingChangeAction === "swap" && pendingSwapType === "individual") {
             calendarSelectionSummary.innerHTML = `<strong>Working day:</strong> ${formatAustralianDate(dates[0])}${dates[1] ? `<br><strong>Day becoming RDO:</strong> ${formatAustralianDate(dates[1])}` : ""}`;
@@ -1586,6 +1619,15 @@ function confirmRosterCalendar() {
     rosterCalendarPage.classList.add("hidden");
     if (["lookup", "month_view"].includes(action)) {
         selectedDate = dates[0];
+
+    if (action === "month_view") {
+        logHeguiEvent("calendar_date_selected", {
+        action: "month_view",
+        details: {
+        selected_date: dateKey(dates[0])
+        }
+  });
+}    
         pendingChangeAction = null;
         pendingCalendarDates = [];
         renderHome();
@@ -1741,7 +1783,7 @@ function editPermanentChangeDates() {
         ],
         swap: [
             swapType.value === "colleague" ? "Colleague Swap" : "Individual Swap",
-            swapType.value === "individual" ? "Choose the RDO/ADO you will work, then choose your nominated replacement RDO." : "Choose the original working day, then choose the original RDO/ADO that becomes the working day."
+            "Choose the two swap dates in either order. Hé Guǐ will determine their roles automatically."
         ],
         add_shift: [setup?.employmentType === "fulltime" ? "Overtime" : "Extra Hours", "Choose one date."],
         roster_change: [
@@ -1753,6 +1795,13 @@ function editPermanentChangeDates() {
     rosterCalendarTitle.textContent = config[0];
     rosterCalendarInstructions.textContent = config[1];
     rosterCalendarPage.classList.remove("hidden");
+
+    logHeguiEvent("calendar_open", {
+     action: action,
+    details: {
+    calendar_mode: action
+  }
+});
     renderRosterCalendar();
 }
 
@@ -1871,12 +1920,29 @@ function savePermanentChange() {
             const secondResult = getShiftForDate(secondDate);
             const secondCode = String(secondResult.shift.code || "").toUpperCase();
             const secondOff = ["O", "A"].includes(secondCode);
-            const firstKey = dateKey(firstDate);
-            const secondKey = dateKey(secondDate);
+            let firstKey = dateKey(firstDate);
+            let secondKey = dateKey(secondDate);
+
+            // For two-date swaps, tap order never matters. Normalize to the roles
+            // expected by the existing save logic.
+            if (!partTime) {
+                if (firstOff === secondOff) {
+                    alert("Choose one original working day and one RDO/ADO for this swap.");
+                    return;
+                }
+                if (swapType.value === "individual" && !firstOff) {
+                    pendingCalendarDates = [secondDate, firstDate];
+                    return savePermanentChange();
+                }
+                if (swapType.value === "colleague" && firstOff) {
+                    pendingCalendarDates = [secondDate, firstDate];
+                    return savePermanentChange();
+                }
+            }
 
             if (swapType.value === "individual") {
                 if (!partTime && (!firstOff || secondOff)) {
-                    alert("For a full-time Individual Swap, choose the RDO/ADO you will work first, then the original working day that becomes your replacement RDO.");
+                    alert("For a full-time Individual Swap, choose one RDO/ADO and one original working day. Tap order does not matter.");
                     return;
                 }
                 if (partTime && secondOff) {
@@ -1908,7 +1974,7 @@ function savePermanentChange() {
                 };
             } else {
                 if (firstOff) {
-                    alert("Choose the original working day first for a Colleague Swap.");
+                    alert("For a Colleague Swap, choose one original working day and the replacement day. Tap order does not matter.");
                     return;
                 }
                 if (!partTime && !secondOff) {
@@ -2588,6 +2654,10 @@ function printRosterGrid() {
     ].join(";");
 
     printButton.addEventListener("click", () => {
+        logHeguiEvent("print_roster", {
+        roster: roster.name,
+        action: "print_or_save_pdf"
+    });
         previewFrame.contentWindow?.focus();
         previewFrame.contentWindow?.print();
     });
@@ -2869,3 +2939,8 @@ function escapeHtml(value) {
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
 }
+window.addEventListener("load", () => {
+  logHeguiEvent("app_open", {
+    action: "open"
+  });
+});

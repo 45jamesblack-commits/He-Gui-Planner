@@ -974,3 +974,28 @@ button.action-locked { opacity:.45; cursor:not-allowed; }
     font-size: 0.9rem;
     line-height: 1.45;
 }
+
+/* Beta 24: multi-shift display + explicit same-day swap mode */
+.top-shift-line, .top-time-line { display:block; }
+.shift-code .top-shift-line:not(:first-child) { font-size:.34em; line-height:1.15; margin-top:4px; }
+.shift-code .top-shift-line.added-shift, .shift-time .added-shift { color:var(--danger); }
+.shift-code .swap-original, .week-day-shift .swap-original { text-decoration:line-through; text-decoration-thickness:2px; }
+.week-day-shift { display:flex; flex-direction:column; gap:2px; }
+.week-shift-added { display:block; color:var(--danger); }
+.week-shift-original { display:block; color:inherit; }
+.calendar-same-day-option { margin:10px 0 12px; }
+.roster-calendar-day .calendar-roster-code.altered-code { display:block; margin-top:1px; color:#ff5a5f; font-size:.72rem; }
+.roster-calendar-day .calendar-roster-code.swap-original { color:#fff; }
+.roster-position.roster-position-corner {
+    position:absolute;
+    top:10px;
+    left:18px;
+    margin:0;
+    max-width:45%;
+    text-align:left;
+    font-size:.82rem;
+    line-height:1.1;
+}
+.roster-calendar-day { position:relative; }
+.calendar-school-holiday-icon { position:absolute; top:2px; right:2px; width:13px; height:13px; object-fit:contain; }
+.calendar-public-holiday-marker { position:absolute; bottom:2px; right:3px; font-size:.48rem; font-weight:900; color:#ffcf66; }

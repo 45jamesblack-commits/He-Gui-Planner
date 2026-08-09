@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
    
-    <link rel="stylesheet" href="styles.css?v=23">
+    <link rel="stylesheet" href="styles.css?v=24">
 </head>
 
 <body>
@@ -93,10 +93,6 @@
                     min="1"
                     placeholder="For example: 56"
                 >
-                <div id="part-time-hours-field" class="hidden">
-                    <label for="contract-hours">Contracted hours per week</label>
-                    <input id="contract-hours" type="number" min="1" max="37.99" step="0.25" placeholder="For example: 21">
-                </div>
                 </div>
 
                 <button id="check-setup" class="primary-button">
@@ -205,7 +201,7 @@
 
     <p><strong>Hé Guǐ Planner</strong></p>
 
-    <p>Version 1.0 Beta 23 Test</p>
+    <p>Version 1.0 Beta 24 Test</p>
 
     <p>Created by</p>
 
@@ -312,6 +308,10 @@
 <section id="roster-calendar-page" class="modal-page hidden">
     <h2 id="roster-calendar-title">Choose Date</h2>
     <p id="roster-calendar-instructions" class="instructions"></p>
+    <label id="calendar-same-day-option" class="break-option calendar-same-day-option hidden" for="calendar-same-day-swap">
+        <input id="calendar-same-day-swap" type="checkbox">
+        <span>Same day swap</span>
+    </label>
 
     <div class="roster-calendar-card">
         <div class="roster-calendar-head">
@@ -423,6 +423,7 @@
     </main>
 
     <script src="holidays.js?v=1"></script>
-    <script src="app.js?v=23"></script>
+    <script src="logger.js?v=1"></script>
+    <script src="app.js?v=24"></script>
 </body>
 </html>
