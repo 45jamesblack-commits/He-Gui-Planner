@@ -999,3 +999,47 @@ button.action-locked { opacity:.45; cursor:not-allowed; }
 .roster-calendar-day { position:relative; }
 .calendar-school-holiday-icon { position:absolute; top:2px; right:2px; width:13px; height:13px; object-fit:contain; }
 .calendar-public-holiday-marker { position:absolute; bottom:2px; right:3px; font-size:.48rem; font-weight:900; color:#ffcf66; }
+
+/* Beta 25 cleanup: compact multi-shift week rows on phones. */
+.week-day-shift {
+    font-size: 0.92em;
+}
+
+.pay-period-hours span {
+    display: block;
+}
+
+.pay-period-hours .pay-summary-divider {
+    height: 1px;
+    margin: 12px 0;
+    background: var(--border);
+}
+
+@media (max-width: 480px) {
+    .week-day {
+        gap: 8px;
+        padding: 10px 12px;
+    }
+
+    .week-day-date {
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 6px;
+        font-size: 0.92rem;
+    }
+
+    .week-day-shift {
+        font-size: 0.86rem;
+        line-height: 1.3;
+    }
+}
+
+.settings-calendar-actions {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.settings-calendar-status {
+    min-height: 1.2em;
+    margin-top: 8px;
+}

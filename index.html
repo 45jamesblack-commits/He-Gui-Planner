@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
    
-    <link rel="stylesheet" href="styles.css?v=24">
+    <link rel="stylesheet" href="styles.css?v=26e">
 </head>
 
 <body>
@@ -33,6 +33,14 @@
             </p>
         </div>
     </div>
+    <script>
+        // Last-resort safety fallback only. Normal startup dismisses the splash
+        // after roster setup has had time to initialise.
+        window.setTimeout(() => {
+            const splash = document.getElementById("startup-splash");
+            if (splash) splash.classList.add("hidden");
+        }, 6500);
+    </script>
     <main class="app-shell">
 
         <header class="app-header compact-app-header">
@@ -141,6 +149,10 @@
                 </button>
             </div>
 
+            <button id="current-month" class="secondary-button full-width">
+                Monthly View
+            </button>
+
             <button id="delete-shift" class="secondary-button full-width hidden">
                 Delete Shift
             </button>
@@ -159,14 +171,6 @@
                 <h2>Next 7 Days</h2>
                 <div id="week-list" class="week-list"></div>
             </section>
-
-            <button id="current-month" class="secondary-button full-width">
-                Current Month
-            </button>
-
-            <button id="lookup-date" class="primary-button">
-                Look Up Date
-            </button>
 
             <button id="print-roster" class="secondary-button full-width">
                 Print Roster Grid
@@ -195,13 +199,45 @@
     <button id="reset-roster" class="secondary-button full-width">
     Reset Current Roster
     </button>
+
+    <h3>Personal Calendar</h3>
+    <p class="instructions">
+        Optional. Add an ICS calendar link from Google, Apple, Samsung or another calendar service.
+        Calendar display will be tested separately.
+    </p>
+    <label for="personal-calendar-name">Calendar name</label>
+    <input id="personal-calendar-name" type="text" placeholder="For example: Personal Calendar">
+
+    <label for="personal-calendar-url">ICS URL</label>
+    <input id="personal-calendar-url" type="url" inputmode="url" placeholder="https://…/calendar.ics">
+
+    <label class="settings-toggle">
+        <input id="personal-calendar-enabled" type="checkbox">
+        <span>Enable personal calendar</span>
+    </label>
+
+    <div class="settings-calendar-actions">
+        <button id="save-personal-calendar" class="secondary-button full-width" type="button">
+            Save Personal Calendar
+        </button>
+        <button id="remove-personal-calendar" class="text-button full-width" type="button">
+            Remove Personal Calendar
+        </button>
+    </div>
+
+    <p id="personal-calendar-status" class="instructions settings-calendar-status"></p>
  
-    
+    <h3>Alpha Administration</h3>
+    <p class="instructions">Testing only. Finalised shifts are normally locked after the two-day correction period.</p>
+    <button id="manage-finalised-shifts" class="secondary-button full-width">
+        Manage Finalised Shift History
+    </button>
+
     <h3>About</h3>
 
     <p><strong>Hé Guǐ Planner</strong></p>
 
-    <p>Version 1.0 Beta 24 Test</p>
+    <p>Version 1.0 Beta 26d Test</p>
 
     <p>Created by</p>
 
@@ -229,6 +265,7 @@
         <button id="choose-individual-swap" class="secondary-button full-width">Individual Swap</button>
         <button id="choose-colleague-swap" class="secondary-button full-width">Colleague Swap</button>
         <button id="choose-extra-hours" class="secondary-button full-width">Extra Hours / Overtime</button>
+        <button id="choose-edit-shifts" class="secondary-button full-width">Edit Shifts</button>
         <button id="choose-management-change" class="secondary-button full-width">Management Roster Change</button>
         <div class="change-remove-group">
             <button id="remove-leave" class="text-button full-width">Deselect Leave</button>
@@ -424,6 +461,6 @@
 
     <script src="holidays.js?v=1"></script>
     <script src="logger.js?v=1"></script>
-    <script src="app.js?v=24"></script>
+    <script src="app.js?v=26e"></script>
 </body>
 </html>
