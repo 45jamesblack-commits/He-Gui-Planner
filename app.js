@@ -16,6 +16,9 @@ const STORAGE_PERSONAL_CALENDAR = "heguiPersonalCalendar";
 const STORAGE_PERSONAL_CALENDAR_CACHE = "heguiPersonalCalendarCacheV27";
 const STORAGE_DISPLAY_THEME = "heguiDisplayTheme";
 const STORAGE_UNLOCKED_FINAL_SHIFTS = "heguiUnlockedFinalShiftsAlphaV27";
+// Set this to the deployed Cloudflare Worker URL for private ICS feeds.
+// Keep the user's secret ICS address out of the URL/query string: the app sends it in a POST body.
+const PERSONAL_CALENDAR_PROXY_URL = "https://hegui-calendar.45james-black.workers.dev";
 const PAY_PERIOD_ANCHOR_START = "2026-07-16";
 const PAY_PERIOD_LENGTH_DAYS = 14;
 
@@ -349,15 +352,36 @@ function getPersonalCalendarEvents(date) {
     return personalCalendarEvents.filter((event) => personalEventOccursOnDate(event, date));
 }
 
+async function fetchPersonalCalendarIcs(calendarUrl) {
+    const normalisedUrl = normaliseCalendarFetchUrl(calendarUrl);
+
+    // Private Google/Outlook ICS feeds commonly block direct browser reads with CORS.
+    // When the Worker is configured, send the secret URL in the POST body rather than
+    // exposing it in a proxy query string or analytics/referrer logs.
+    if (PERSONAL_CALENDAR_PROXY_URL) {
+        const response = await fetch(PERSONAL_CALENDAR_PROXY_URL, {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: normalisedUrl })
+        });
+        if (!response.ok) throw new Error(`Calendar proxy HTTP ${response.status}`);
+        return response.text();
+    }
+
+    // Direct fetch remains useful for calendar providers that already permit browser access.
+    const response = await fetch(normalisedUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Calendar HTTP ${response.status}`);
+    return response.text();
+}
+
 async function refreshPersonalCalendar(showStatus = false) {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
     if (!saved.enabled || !saved.url) return;
     if (showStatus && personalCalendarStatus) personalCalendarStatus.textContent = "Loading personal calendar…";
     try {
-        const response = await fetch(normaliseCalendarFetchUrl(saved.url), { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const text = await response.text();
+        const text = await fetchPersonalCalendarIcs(saved.url);
         const events = parseIcsEvents(text);
         personalCalendarEvents = events;
         localStorage.setItem(STORAGE_PERSONAL_CALENDAR_CACHE, JSON.stringify({ updatedAt: new Date().toISOString(), events }));
@@ -367,8 +391,10 @@ async function refreshPersonalCalendar(showStatus = false) {
     } catch (error) {
         if (personalCalendarStatus) {
             personalCalendarStatus.textContent = personalCalendarEvents.length
-                ? "Could not refresh this ICS link in the browser. Showing the last saved calendar copy."
-                : "Could not load this ICS link. The calendar provider may block direct browser access.";
+                ? "Could not refresh the personal calendar. Showing the last saved calendar copy."
+                : (PERSONAL_CALENDAR_PROXY_URL
+                    ? "Could not load the personal calendar through the calendar service."
+                    : "This calendar provider blocks direct browser access. Hé Guǐ's calendar service still needs its one-time connection URL.");
         }
     }
 }
@@ -2789,17 +2815,52 @@ function renderPayPeriodSummary() {
     }
     payPeriodSummary.classList.remove("hidden");
 }
+function clearActiveProfileRosterData() {
+    const profileId = profiles[activeProfileIndex]?.id;
+    if (!profileId) return;
+
+    // Collect final-shift unlock keys belonging to this profile before the shifts are removed.
+    const unlockKeysToRemove = new Set();
+    const casualEntries = Object.values(loadAllCasualShifts()[profileId] || {}).flatMap(normaliseCasualDay);
+    casualEntries.forEach((entry) => unlockKeysToRemove.add(finalShiftUnlockKey("casual", entry)));
+    const addedEntries = Object.values(loadAddedShifts()[profileId] || {}).flat().filter(Boolean);
+    addedEntries.forEach((entry) => unlockKeysToRemove.add(finalShiftUnlockKey("added", entry)));
+
+    const stores = [
+        [STORAGE_CASUAL_SHIFTS, loadAllCasualShifts()],
+        [STORAGE_PERMANENT_CHANGES, loadPermanentChanges()],
+        [STORAGE_ADDED_SHIFTS, loadAddedShifts()]
+    ];
+
+    stores.forEach(([storageKey, all]) => {
+        if (Object.prototype.hasOwnProperty.call(all, profileId)) {
+            delete all[profileId];
+            localStorage.setItem(storageKey, JSON.stringify(all));
+        }
+    });
+
+    if (unlockKeysToRemove.size) {
+        const unlocked = loadUnlockedFinalShifts();
+        unlockKeysToRemove.forEach((key) => unlocked.delete(key));
+        saveUnlockedFinalShifts(unlocked);
+    }
+
+    editingAddedShiftId = null;
+    editingCasualShiftId = null;
+}
+
 function resetSetup() {
     const casual = setup?.type === "casual";
     const reset = confirm(casual
-        ? "Reset Casual Shift Log setup?\n\nSaved casual shifts will remain on this device."
-        : "Reset the selected roster and starting number?\n\nThe imported roster CSV will remain on this device."
+        ? "Reset Casual Shift Log?\n\nThis will remove all saved casual shifts for this profile. Your profile and app settings will remain."
+        : "Reset this roster?\n\nThis will remove leave, swaps, management changes, extra/overtime shifts and final-shift test unlocks for this profile. Your profile and app settings will remain."
     );
 
     if (!reset) {
         return;
     }
 
+    clearActiveProfileRosterData();
     setup = null;
     profiles[activeProfileIndex].setup = null;
     saveProfiles();
