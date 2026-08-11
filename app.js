@@ -13,6 +13,9 @@ const STORAGE_PERMANENT_CHANGES = "heguiPermanentChanges";
 const STORAGE_ADDED_SHIFTS = "heguiAddedShiftsV20";
 const STORAGE_SHOW_STARTUP_SPLASH = "heguiShowStartupSplash";
 const STORAGE_PERSONAL_CALENDAR = "heguiPersonalCalendar";
+const STORAGE_PERSONAL_CALENDAR_CACHE = "heguiPersonalCalendarCacheV27";
+const STORAGE_DISPLAY_THEME = "heguiDisplayTheme";
+const STORAGE_UNLOCKED_FINAL_SHIFTS = "heguiUnlockedFinalShiftsAlphaV27";
 const PAY_PERIOD_ANCHOR_START = "2026-07-16";
 const PAY_PERIOD_LENGTH_DAYS = 14;
 
@@ -30,6 +33,8 @@ let setup = null;
 let selectedDate = startOfDay(new Date());
 let showActPublicHolidays = true;
 let showActSchoolHolidays = false;
+let personalCalendarEvents = [];
+let editingAddedShiftId = null;
 const startupSplashStartedAt = Date.now();
 
 const setupScreen = document.querySelector("#setup-screen");
@@ -85,6 +90,7 @@ const personalCalendarEnabled = document.querySelector("#personal-calendar-enabl
 const savePersonalCalendarButton = document.querySelector("#save-personal-calendar");
 const removePersonalCalendarButton = document.querySelector("#remove-personal-calendar");
 const personalCalendarStatus = document.querySelector("#personal-calendar-status");
+const displayTheme = document.querySelector("#display-theme");
 const payPeriodDates = document.querySelector("#pay-period-dates");
 const paydayDate = document.querySelector("#payday-date");
 const payPeriodHours = document.querySelector("#pay-period-hours");
@@ -133,6 +139,17 @@ const permanentChangeNotes = document.querySelector("#permanent-change-notes");
 const resetRosterButton =
     document.querySelector("#reset-roster");
 
+function applyDisplayTheme(theme) {
+    const allowed = new Set(["light", "medium", "dark"]);
+    const chosen = allowed.has(theme) ? theme : "medium";
+    document.documentElement.dataset.theme = chosen;
+    if (displayTheme) displayTheme.value = chosen;
+    localStorage.setItem(STORAGE_DISPLAY_THEME, chosen);
+}
+
+applyDisplayTheme(localStorage.getItem(STORAGE_DISPLAY_THEME) || "medium");
+displayTheme?.addEventListener("change", () => applyDisplayTheme(displayTheme.value));
+
 const savedStartupSplashPreference =
     localStorage.getItem(STORAGE_SHOW_STARTUP_SPLASH);
 const showStartupSplash = savedStartupSplashPreference !== "false";
@@ -172,6 +189,13 @@ function loadPersonalCalendarSettings() {
     if (personalCalendarUrl) personalCalendarUrl.value = saved.url || "";
     if (personalCalendarEnabled) personalCalendarEnabled.checked = Boolean(saved.enabled && saved.url);
 
+    try {
+        const cache = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR_CACHE)) || {};
+        personalCalendarEvents = Array.isArray(cache.events) ? cache.events : [];
+    } catch (error) {
+        personalCalendarEvents = [];
+    }
+
     if (personalCalendarStatus) {
         personalCalendarStatus.textContent = saved.url
             ? (saved.enabled ? "Personal calendar saved and enabled." : "Personal calendar saved but disabled.")
@@ -179,64 +203,206 @@ function loadPersonalCalendarSettings() {
     }
 }
 
-function savePersonalCalendarSettings() {
-    const name = personalCalendarName?.value.trim() || "Personal Calendar";
-    const url = personalCalendarUrl?.value.trim() || "";
+function normaliseCalendarFetchUrl(url) {
+    return String(url || "").replace(/^webcal:\/\//i, "https://");
+}
 
-    if (!url) {
-        alert("Enter an ICS calendar URL first.");
-        personalCalendarUrl?.focus();
-        return;
+function unfoldIcsLines(text) {
+    return String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n[ \t]/g, "").split("\n");
+}
+
+function decodeIcsText(value) {
+    return String(value || "")
+        .replace(/\\n/gi, " ")
+        .replace(/\\,/g, ",")
+        .replace(/\\;/g, ";")
+        .replace(/\\\\/g, "\\");
+}
+
+function parseIcsDateValue(value, params = "") {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    if (/VALUE=DATE/i.test(params) || /^\d{8}$/.test(raw)) {
+        const y = Number(raw.slice(0, 4));
+        const m = Number(raw.slice(4, 6)) - 1;
+        const d = Number(raw.slice(6, 8));
+        return { iso: new Date(y, m, d).toISOString(), allDay: true };
     }
+    const match = raw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/);
+    if (!match) return null;
+    const [, y, mo, d, h, mi, sec = "00", z] = match;
+    const date = z
+        ? new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +sec))
+        : new Date(+y, +mo - 1, +d, +h, +mi, +sec);
+    return { iso: date.toISOString(), allDay: false };
+}
 
-    let parsedUrl;
+function parseRRule(value) {
+    const out = {};
+    String(value || "").split(";").forEach((part) => {
+        const [key, val] = part.split("=");
+        if (key && val) out[key.toUpperCase()] = val;
+    });
+    return out;
+}
+
+function parseIcsEvents(text) {
+    const lines = unfoldIcsLines(text);
+    const events = [];
+    let current = null;
+    for (const line of lines) {
+        if (line === "BEGIN:VEVENT") { current = {}; continue; }
+        if (line === "END:VEVENT") {
+            if (current?.start?.iso) events.push(current);
+            current = null;
+            continue;
+        }
+        if (!current) continue;
+        const colon = line.indexOf(":");
+        if (colon < 0) continue;
+        const left = line.slice(0, colon);
+        const value = line.slice(colon + 1);
+        const [name, ...paramParts] = left.split(";");
+        const params = paramParts.join(";");
+        switch (name.toUpperCase()) {
+            case "UID": current.uid = value; break;
+            case "SUMMARY": current.summary = decodeIcsText(value) || "Calendar event"; break;
+            case "LOCATION": current.location = decodeIcsText(value); break;
+            case "DTSTART": current.start = parseIcsDateValue(value, params); break;
+            case "DTEND": current.end = parseIcsDateValue(value, params); break;
+            case "RRULE": current.rrule = parseRRule(value); break;
+            case "EXDATE": {
+                current.exdates ||= [];
+                value.split(",").forEach((v) => {
+                    const parsed = parseIcsDateValue(v, params);
+                    if (parsed) current.exdates.push(parsed.iso);
+                });
+                break;
+            }
+        }
+    }
+    return events;
+}
+
+function dayKeyFromIso(iso) {
+    return dateKey(startOfDay(new Date(iso)));
+}
+
+function weekdayCode(date) {
+    return ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][date.getDay()];
+}
+
+function personalEventOccursOnDate(event, date) {
+    const target = startOfDay(date);
+    const start = startOfDay(new Date(event.start.iso));
+    const end = event.end?.iso ? startOfDay(new Date(event.end.iso)) : start;
+    const endInclusive = event.start.allDay && event.end?.iso ? addDays(end, -1) : end;
+    const targetKey = dateKey(target);
+    if ((event.exdates || []).some((iso) => dayKeyFromIso(iso) === targetKey)) return false;
+
+    if (!event.rrule?.FREQ) return target >= start && target <= endInclusive;
+    if (target < start) return false;
+
+    const rule = event.rrule;
+    const interval = Math.max(1, Number(rule.INTERVAL || 1));
+    if (rule.UNTIL) {
+        const untilParsed = parseIcsDateValue(rule.UNTIL, "");
+        if (untilParsed && target > startOfDay(new Date(untilParsed.iso))) return false;
+    }
+    const days = dayDifference(start, target);
+    let matches = false;
+    if (rule.FREQ === "DAILY") {
+        matches = days % interval === 0;
+    } else if (rule.FREQ === "WEEKLY") {
+        const weeks = Math.floor(days / 7);
+        const byday = (rule.BYDAY || weekdayCode(start)).split(",").map((v) => v.slice(-2));
+        matches = weeks % interval === 0 && byday.includes(weekdayCode(target));
+    } else if (rule.FREQ === "MONTHLY") {
+        const months = (target.getFullYear() - start.getFullYear()) * 12 + target.getMonth() - start.getMonth();
+        const wantedDays = (rule.BYMONTHDAY || String(start.getDate())).split(",").map(Number);
+        matches = months >= 0 && months % interval === 0 && wantedDays.includes(target.getDate());
+    } else if (rule.FREQ === "YEARLY") {
+        const years = target.getFullYear() - start.getFullYear();
+        const month = Number(rule.BYMONTH || start.getMonth() + 1);
+        const monthDay = Number(rule.BYMONTHDAY || start.getDate());
+        matches = years >= 0 && years % interval === 0 && target.getMonth() + 1 === month && target.getDate() === monthDay;
+    }
+    if (!matches) return false;
+
+    if (rule.COUNT) {
+        // Count occurrences from DTSTART up to the target. This bounded loop keeps browser work small.
+        let count = 0;
+        for (let d = startOfDay(start); d <= target && count <= Number(rule.COUNT); d = addDays(d, 1)) {
+            const clone = { ...event, rrule: { ...rule } };
+            delete clone.rrule.COUNT;
+            if (personalEventOccursOnDate(clone, d)) count += 1;
+        }
+        if (count > Number(rule.COUNT)) return false;
+    }
+    return true;
+}
+
+function getPersonalCalendarEvents(date) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
+    if (!saved.enabled) return [];
+    return personalCalendarEvents.filter((event) => personalEventOccursOnDate(event, date));
+}
+
+async function refreshPersonalCalendar(showStatus = false) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
+    if (!saved.enabled || !saved.url) return;
+    if (showStatus && personalCalendarStatus) personalCalendarStatus.textContent = "Loading personal calendar…";
     try {
-        parsedUrl = new URL(url);
+        const response = await fetch(normaliseCalendarFetchUrl(saved.url), { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        const events = parseIcsEvents(text);
+        personalCalendarEvents = events;
+        localStorage.setItem(STORAGE_PERSONAL_CALENDAR_CACHE, JSON.stringify({ updatedAt: new Date().toISOString(), events }));
+        if (personalCalendarStatus) personalCalendarStatus.textContent = `Calendar active — ${events.length} events loaded.`;
+        if (setup && rosters.length > 0) renderHome();
+        if (!rosterCalendarPage?.classList.contains("hidden")) renderRosterCalendar();
     } catch (error) {
-        alert("That does not look like a valid calendar URL.");
-        personalCalendarUrl?.focus();
-        return;
-    }
-
-    if (!/^https?:$/.test(parsedUrl.protocol)) {
-        alert("Please use an http or https ICS calendar URL.");
-        personalCalendarUrl?.focus();
-        return;
-    }
-
-    const saved = {
-        name,
-        url,
-        enabled: Boolean(personalCalendarEnabled?.checked)
-    };
-
-    localStorage.setItem(STORAGE_PERSONAL_CALENDAR, JSON.stringify(saved));
-    if (personalCalendarStatus) {
-        personalCalendarStatus.textContent = saved.enabled
-            ? "Personal calendar saved and enabled."
-            : "Personal calendar saved but disabled.";
+        if (personalCalendarStatus) {
+            personalCalendarStatus.textContent = personalCalendarEvents.length
+                ? "Could not refresh this ICS link in the browser. Showing the last saved calendar copy."
+                : "Could not load this ICS link. The calendar provider may block direct browser access.";
+        }
     }
 }
 
+async function savePersonalCalendarSettings() {
+    const name = personalCalendarName?.value.trim() || "Personal Calendar";
+    const url = personalCalendarUrl?.value.trim() || "";
+    if (!url) { alert("Enter an ICS calendar URL first."); personalCalendarUrl?.focus(); return; }
+    let parsedUrl;
+    try { parsedUrl = new URL(normaliseCalendarFetchUrl(url)); } catch (error) { alert("That does not look like a valid calendar URL."); personalCalendarUrl?.focus(); return; }
+    if (!/^https?:$/.test(parsedUrl.protocol)) { alert("Please use an http, https or webcal ICS calendar URL."); personalCalendarUrl?.focus(); return; }
+    const saved = { name, url, enabled: Boolean(personalCalendarEnabled?.checked) };
+    localStorage.setItem(STORAGE_PERSONAL_CALENDAR, JSON.stringify(saved));
+    if (saved.enabled) await refreshPersonalCalendar(true);
+    else if (personalCalendarStatus) personalCalendarStatus.textContent = "Personal calendar saved but disabled.";
+}
+
 function removePersonalCalendarSettings() {
-    if (!localStorage.getItem(STORAGE_PERSONAL_CALENDAR) && !personalCalendarUrl?.value.trim()) {
-        return;
-    }
-
-    if (!confirm("Remove the saved personal calendar?")) {
-        return;
-    }
-
+    if (!localStorage.getItem(STORAGE_PERSONAL_CALENDAR) && !personalCalendarUrl?.value.trim()) return;
+    if (!confirm("Remove the saved personal calendar?")) return;
     localStorage.removeItem(STORAGE_PERSONAL_CALENDAR);
+    localStorage.removeItem(STORAGE_PERSONAL_CALENDAR_CACHE);
+    personalCalendarEvents = [];
     if (personalCalendarName) personalCalendarName.value = "";
     if (personalCalendarUrl) personalCalendarUrl.value = "";
     if (personalCalendarEnabled) personalCalendarEnabled.checked = false;
     if (personalCalendarStatus) personalCalendarStatus.textContent = "Personal calendar removed.";
+    if (setup && rosters.length > 0) renderHome();
 }
 
 loadPersonalCalendarSettings();
 savePersonalCalendarButton?.addEventListener("click", savePersonalCalendarSettings);
 removePersonalCalendarButton?.addEventListener("click", removePersonalCalendarSettings);
+setTimeout(() => refreshPersonalCalendar(false), 250);
 
 extrasButton.addEventListener("click", () => {
     extrasPage.classList.remove("hidden");
@@ -337,7 +503,7 @@ document.querySelector("#remove-leave").addEventListener("click", () => {
     openRosterCalendar("remove_leave");
 });
 deleteSwapGlobalButton.addEventListener("click", () => openDeleteRecordPage("swap"));
-deleteAddedShiftGlobalButton.addEventListener("click", () => openDeleteRecordPage("added_shift"));
+deleteAddedShiftGlobalButton.addEventListener("click", () => openDeleteRecordPage("delete_added_shift"));
 deleteManagementGlobalButton.addEventListener("click", () => openDeleteRecordPage("management"));
 document.querySelector("#close-delete-record").addEventListener("click", () => {
     deleteRecordPage.classList.add("hidden");
@@ -1093,118 +1259,94 @@ function renderHoliday(date) {
 
 function renderWeek() {
     weekList.innerHTML = "";
-
     const today = startOfDay(new Date());
 
     for (let offset = 0; offset < 7; offset += 1) {
         const date = addDays(selectedDate, offset);
-        const casualEntries = setup?.type === "casual" ? getCasualShifts(date).slice(0, 3) : [];
-        const casualEntry = casualEntries[0] || null;
-        const result = setup?.type === "casual"
-            ? null
-            : getShiftForDate(date);
-        const permanentChange = setup?.type === "casual"
-            ? null
-            : getPermanentChange(date);
+        const result = setup?.type === "casual" ? null : getShiftForDate(date);
+        const permanentChange = setup?.type === "casual" ? null : getPermanentChange(date);
         const row = document.createElement("button");
-
         row.type = "button";
         row.className = "week-day";
 
         const differenceFromToday = dayDifference(today, date);
-
         let label;
+        if (differenceFromToday === 0) label = "Today";
+        else if (differenceFromToday === 1) label = "Tomorrow";
+        else if (date <= endOfCurrentWeek(today)) label = date.toLocaleDateString("en-AU", { weekday: "long" });
+        else label = date.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
 
-        if (differenceFromToday === 0) {
-            label = "Today";
-        } else if (differenceFromToday === 1) {
-            label = "Tomorrow";
-                } else if (date <= endOfCurrentWeek(today)) {
-            label = date.toLocaleDateString("en-AU", {
-                weekday: "long"
+        const holidayName = showActPublicHolidays ? getActPublicHoliday(date) : "";
+        const holidayMarkup = holidayName ? `<span class="week-day-holiday">${escapeHtml(holidayName)}</span>` : "";
+        const schoolHolidayName = showActSchoolHolidays ? getActSchoolHoliday(date) : "";
+        const schoolHolidayIconMarkup = schoolHolidayName
+            ? `<img class="school-holiday-icon" src="school-holidays-icon.png" alt="" aria-hidden="true">`
+            : "";
+        const schoolHolidayMarkup = schoolHolidayName ? `<span class="week-day-school-holiday">${escapeHtml(schoolHolidayName)}</span>` : "";
+
+        const shiftItems = [];
+        if (setup?.type === "casual") {
+            getCasualShifts(date).forEach((entry) => {
+                shiftItems.push({
+                    text: `${entry.code} ${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`,
+                    added: true,
+                    edited: Boolean(entry.timesEdited)
+                });
             });
         } else {
-            label = date.toLocaleDateString("en-AU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short"
-});
+            if (permanentChange?.type === "swap_worked" && (permanentChange.sameDay || permanentChange.preserveOriginal)) {
+                shiftItems.push({ text: displayShift(result.shift), original: true, strike: Boolean(permanentChange.sameDay) });
+                shiftItems.push({ text: displayShift(permanentDisplayShift(permanentChange, result.shift)), added: true });
+            } else if (permanentChange?.type === "swap_off") {
+                shiftItems.push({ text: displayShift(result.shift), original: true, strike: true });
+                shiftItems.push({ text: displayShift(permanentDisplayShift(permanentChange, result.shift)), added: true });
+            } else {
+                shiftItems.push({
+                    text: permanentChange ? displayShift(permanentDisplayShift(permanentChange, result.shift)) : displayShift(result.shift),
+                    added: Boolean(permanentChange)
+                });
+            }
+            getAddedShifts(date).forEach((entry) => {
+                shiftItems.push({ text: `${entry.code} ${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`, added: true });
+            });
         }
 
-        const holidayName = showActPublicHolidays
-            ? getActPublicHoliday(date)
-            : "";
-        const holidayMarkup = holidayName
-            ? `<span class="week-day-holiday">${escapeHtml(holidayName)}</span>`
-            : "";
-        const schoolHolidayName = showActSchoolHolidays
-            ? getActSchoolHoliday(date)
-            : "";
-        const schoolHolidayIconMarkup = schoolHolidayName
-            ? `
-                <img
-                    class="school-holiday-icon"
-                    src="school-holidays-icon.png"
-                    alt=""
-                    aria-hidden="true"
-                >
-            `
-            : "";
-        const schoolHolidayMarkup = schoolHolidayName
-            ? `<span class="week-day-school-holiday">${escapeHtml(schoolHolidayName)}</span>`
-            : "";
+        const hasOverflow = shiftItems.length > 3;
+        const visibleShiftItems = shiftItems.slice(0, 3);
+        const shiftMarkup = visibleShiftItems.length
+            ? visibleShiftItems.map((item) => {
+                const classes = [item.added ? "week-shift-added" : "week-shift-original"];
+                if (item.strike) classes.push("swap-original");
+                return `<span class="${classes.join(" ")}">${escapeHtml(item.text)}</span>`;
+            }).join("")
+            : "No shift";
 
-        const addedShifts = setup?.type === "roster" ? getAddedShifts(date).slice(0, 2) : [];
-        const baseShiftDisplay = setup?.type === "casual"
-            ? casualEntries.length
-                ? casualEntries.map((entry) => `${entry.code} ${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`).join("\n")
-                : "No shift"
-            : permanentChange
-                ? displayShift(permanentDisplayShift(permanentChange, result.shift))
-                : displayShift(result.shift);
-        let shiftMarkup = setup?.type === "casual" && casualEntries.length
-            ? casualEntries.map((entry) => `<span class="week-shift-added">${escapeHtml(`${entry.code} ${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`)}</span>`).join("")
-            : escapeHtml(baseShiftDisplay);
-        if (permanentChange?.type === "swap_worked" && (permanentChange.sameDay || permanentChange.preserveOriginal)) {
-            shiftMarkup = `<span class="week-shift-original ${permanentChange.sameDay ? "swap-original" : ""}">${escapeHtml(displayShift(result.shift))}</span><span class="week-shift-added">${escapeHtml(displayShift(permanentDisplayShift(permanentChange, result.shift)))}</span>`;
-        }
-        if (addedShifts.length) {
-            shiftMarkup += addedShifts.map((entry) => `<span class="week-shift-added">${escapeHtml(`${entry.code} ${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`)}</span>`).join("");
-        }
+        if (permanentChange || visibleShiftItems.some((item) => item.edited)) row.classList.add("edited-shift");
+        if (hasOverflow) row.classList.add("week-shift-overflow");
 
-        if (casualEntry?.timesEdited) {
-            row.classList.add("edited-shift");
-        }
-        if (permanentChange) {
-            row.classList.add("edited-shift");
-        }
+        const personalEvents = getPersonalCalendarEvents(date);
+        const personalEventMarkup = personalEvents.length
+            ? `<span class="week-personal-events">${personalEvents.slice(0, 2).map((event) => `<span>${escapeHtml(event.summary || "Calendar event")}</span>`).join("")}${personalEvents.length > 2 ? `<span>+${personalEvents.length - 2} more</span>` : ""}</span>`
+            : "";
 
         row.innerHTML = `
+            ${hasOverflow ? '<span class="week-overflow-dot" title="More shifts — check Monthly View" aria-label="More shifts — check Monthly View"></span>' : ""}
             <span class="week-day-date">
-                <span class="school-holiday-icon-slot">
-                    ${schoolHolidayIconMarkup}
-                </span>
+                <span class="school-holiday-icon-slot">${schoolHolidayIconMarkup}</span>
                 <span class="week-day-date-copy">
                     <span>${escapeHtml(label)}</span>
                     ${holidayMarkup}
                     ${schoolHolidayMarkup}
                 </span>
             </span>
-
-            <span class="week-day-shift">
-                ${shiftMarkup}
-            </span>
+            <span class="week-day-shift">${shiftMarkup}${personalEventMarkup}</span>
         `;
 
         row.addEventListener("click", () => {
             selectedDate = date;
             renderHome();
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth"
-            });
+            window.scrollTo({ top: 0, behavior: "smooth" });
         });
-
         weekList.appendChild(row);
     }
 }
@@ -1291,9 +1433,11 @@ function openDeleteRecordPage(kind) {
 
     if (kind === "casual_shift") {
         const profile = loadAllCasualShifts()[profileId] || {};
-        items = Object.values(profile).flatMap(normaliseCasualDay).filter((entry) => !isShiftFinalised(entry.date)).map((entry) => ({
+        items = Object.values(profile).flatMap(normaliseCasualDay).filter((entry) => !isEntryFinalised("casual", entry)).map((entry) => ({
             id: entry.id,
+            sortDate: entry.date,
             label: `${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}`,
+            countdown: finalisationCountdown(entry.date),
             edit: () => {
                 selectedDate = parseDateKey(entry.date);
                 deleteRecordPage.classList.add("hidden");
@@ -1303,8 +1447,22 @@ function openDeleteRecordPage(kind) {
         deleteRecordTitle.textContent = "Edit Shifts";
     } else if (kind === "added_shift") {
         const profile = loadAddedShifts()[profileId] || {};
-        items = Object.values(profile).flat().filter((entry) => !isShiftFinalised(entry.date)).map((entry) => ({
+        items = Object.values(profile).flat().filter((entry) => !isEntryFinalised("added", entry)).map((entry) => ({
             id: entry.id,
+            sortDate: entry.date,
+            label: `${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}${entry.payClass === "overtime" ? " · Overtime" : " · Extra hours"}`,
+            countdown: finalisationCountdown(entry.date),
+            edit: () => {
+                deleteRecordPage.classList.add("hidden");
+                openAddedShiftEditor(entry);
+            }
+        }));
+        deleteRecordTitle.textContent = "Edit Added Shifts";
+    } else if (kind === "delete_added_shift") {
+        const profile = loadAddedShifts()[profileId] || {};
+        items = Object.values(profile).flat().map((entry) => ({
+            id: entry.id,
+            sortDate: entry.date,
             label: `${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}${entry.payClass === "overtime" ? " · Overtime" : " · Extra hours"}`,
             remove: () => deleteAddedShiftById(entry.id)
         }));
@@ -1313,21 +1471,23 @@ function openDeleteRecordPage(kind) {
         const casualProfile = loadAllCasualShifts()[profileId] || {};
         const addedProfile = loadAddedShifts()[profileId] || {};
         const casualItems = Object.values(casualProfile).flatMap(normaliseCasualDay)
-            .filter((entry) => isShiftFinalised(entry.date))
+            .filter((entry) => isEntryFinalised("casual", entry))
             .map((entry) => ({
-                id: `casual-${entry.date}`,
+                id: `casual-${entry.id}`,
+                sortDate: entry.date,
                 label: `FINAL · ${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}`,
-                remove: () => deleteCasualShiftByDate(entry.date)
+                unlock: () => unlockFinalisedEntry("casual", entry)
             }));
         const addedItems = Object.values(addedProfile).flat()
-            .filter((entry) => isShiftFinalised(entry.date))
+            .filter((entry) => isEntryFinalised("added", entry))
             .map((entry) => ({
                 id: `added-${entry.id}`,
+                sortDate: entry.date,
                 label: `FINAL · ${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}${entry.payClass === "overtime" ? " · Overtime" : " · Extra hours"}`,
-                remove: () => deleteAddedShiftById(entry.id)
+                unlock: () => unlockFinalisedEntry("added", entry)
             }));
         items = [...casualItems, ...addedItems];
-        deleteRecordTitle.textContent = "Alpha — Finalised Shift History";
+        deleteRecordTitle.textContent = "Alpha — Unlock Finalised Shift";
     } else {
         const records = loadPermanentChanges()[profileId] || {};
         const wanted = kind === "swap"
@@ -1350,7 +1510,7 @@ function openDeleteRecordPage(kind) {
         deleteRecordTitle.textContent = kind === "swap" ? "Delete Swap" : "Delete Management Change";
     }
 
-    items.sort((a,b) => a.label.localeCompare(b.label));
+    items.sort((a,b) => String(a.sortDate || a.label).localeCompare(String(b.sortDate || b.label)));
     if (!items.length) {
         deleteRecordPage.classList.add("hidden");
         changeActionPage.classList.add("hidden");
@@ -1358,14 +1518,23 @@ function openDeleteRecordPage(kind) {
         return;
     }
 
-    items.forEach((item) => {
+    items.forEach((item, index) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "secondary-button full-width delete-record-item";
-        button.textContent = item.label;
+        if (index === 0 && ["added_shift", "casual_shift"].includes(kind)) button.classList.add("oldest-shift-item");
+        const showCountdown = index === 0 && ["added_shift", "casual_shift"].includes(kind) && item.countdown;
+        button.innerHTML = `<span class="record-item-label">${escapeHtml(item.label)}</span>${showCountdown ? `<span class="shift-lock-countdown">${escapeHtml(item.countdown)}</span>` : ""}`;
         button.addEventListener("click", () => {
             if (item.edit) {
                 item.edit();
+                return;
+            }
+            if (item.unlock) {
+                if (!confirm(`Unlock ${item.label}?`)) return;
+                item.unlock();
+                renderHome();
+                openDeleteRecordPage(kind);
                 return;
             }
             if (!confirm(`Delete ${item.label}?`)) return;
@@ -1575,6 +1744,9 @@ function renderRosterCalendar() {
         const leaveColour = rosterCalendarColour(code);
         const fortnightShade = rosterCalendarFortnightShade(date);
         const addedCodes = rosterCalendarAddedCodes(date);
+        const casualCodes = setup?.type === "casual"
+            ? getCasualShifts(date).map((entry) => entry.code).filter(Boolean)
+            : [];
         const altered = calendarChangeIsAltered(date);
         button.className = `roster-calendar-day ${fortnightShade} ${leaveColour}`.trim();
         const currentPeriod = getPayPeriodForDate(new Date());
@@ -1584,7 +1756,15 @@ function renderRosterCalendar() {
         if (["leave", "remove_leave"].includes(pendingChangeAction) && ordered.length === 2 && date >= ordered[0] && date <= ordered[1]) button.classList.add("in-range");
         const change = setup?.type === "roster" ? getPermanentChange(date) : null;
         const originalCode = setup?.type === "roster" ? String(getShiftForDate(date).shift.code || "") : "";
-        const visibleCodes = addedCodes.length ? [code, ...addedCodes].filter((v) => v && !["O", "A"].includes(String(v).toUpperCase())) : [];
+        const baseIsVisibleWithExtras = code && !["O", "A"].includes(String(code).toUpperCase());
+        const codeItems = setup?.type === "casual"
+            ? casualCodes.map((value) => ({ value, extra: true })).slice(0, 3)
+            : addedCodes.length
+                ? [
+                    ...(baseIsVisibleWithExtras ? [{ value: code, extra: false }] : []),
+                    ...addedCodes.map((value) => ({ value, extra: true }))
+                  ].slice(0, 3)
+                : [];
         if (change?.type === "swap_worked" && (change.sameDay || change.preserveOriginal)) {
             const originalMarkup = change.sameDay
                 ? `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "—")}</span>`
@@ -1592,10 +1772,9 @@ function renderRosterCalendar() {
             button.innerHTML = `${originalMarkup}<span class="calendar-roster-code swap-new">${escapeHtml(change.code || "—")}</span>`;
         } else if (change?.type === "swap_off") {
             button.innerHTML = `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "—")}</span><span class="calendar-roster-code swap-new">${escapeHtml(change.code || "O")}</span>`;
-        } else if (visibleCodes.length >= 2) {
-            button.innerHTML = `<span class="calendar-date-number">${day}</span><span class="calendar-roster-code">${escapeHtml(visibleCodes[0])}</span>${visibleCodes.slice(1,3).map((value) => `<span class="calendar-roster-code altered-code">${escapeHtml(value)}</span>`).join("")}`;
-        } else if (addedCodes.length) {
-            button.innerHTML = `<span class="calendar-date-number">${day}</span><span class="calendar-roster-code altered-code">${escapeHtml(addedCodes[0])}</span>`;
+        } else if (codeItems.length) {
+            const hideDateNumber = codeItems.length >= 3;
+            button.innerHTML = `${hideDateNumber ? "" : `<span class="calendar-date-number">${day}</span>`}${codeItems.map((item) => `<span class="calendar-roster-code${item.extra ? " altered-code" : ""}">${escapeHtml(item.value)}</span>`).join("")}`;
         } else {
             button.innerHTML = `<span class="calendar-date-number">${day}</span><span class="calendar-roster-code">${escapeHtml(code || "—")}</span>`;
         }
@@ -1615,6 +1794,14 @@ function renderRosterCalendar() {
             marker.textContent = "PH";
             marker.title = calendarPublicHoliday;
             button.appendChild(marker);
+        }
+        const personalEvents = getPersonalCalendarEvents(date);
+        if (personalEvents.length) {
+            const event = document.createElement("span");
+            event.className = "calendar-personal-event";
+            event.textContent = personalEvents[0].summary || "Calendar";
+            event.title = personalEvents.map((item) => item.summary || "Calendar event").join(" · ");
+            button.appendChild(event);
         }
         button.addEventListener("click", () => chooseRosterCalendarDate(date));
         rosterCalendarGrid.appendChild(button);
@@ -1782,7 +1969,22 @@ function renderPermanentChangeDateSummary() {
     }
 }
 
+function openAddedShiftEditor(entry) {
+    if (!entry) return;
+    editingAddedShiftId = entry.id;
+    selectedDate = parseDateKey(entry.date);
+    openPermanentChangeEditor("add_shift", [selectedDate]);
+    const standardIndex = shiftCodes.findIndex((shift) => shift.code === entry.code);
+    permanentShiftCode.value = standardIndex >= 0 ? String(standardIndex) : "spare";
+    permanentStartTime.value = entry.start || "";
+    permanentFinishTime.value = entry.finish || "";
+    permanentBreak.checked = Number(entry.unpaidBreakMinutes || 0) >= 30;
+    permanentChangeNotes.value = entry.notes || "";
+    renderPermanentChangeDateSummary();
+}
+
 function openPermanentChangeEditor(action = "add_shift", dates = [selectedDate]) {
+    if (action !== "add_shift" || !editingAddedShiftId) editingAddedShiftId = null;
     pendingChangeAction = action;
     pendingCalendarDates = dates.map(startOfDay);
     permanentChangeType.value = action;
@@ -1897,6 +2099,7 @@ function editPermanentChangeDates() {
 
 function closePermanentChangeEditor() {
     permanentChangePage.classList.add("hidden");
+    editingAddedShiftId = null;
     pendingChangeAction = null;
     pendingCalendarDates = [];
     pendingLeaveType = "annual_leave";
@@ -1957,21 +2160,39 @@ function savePermanentChange() {
             return;
         }
         const date = pendingCalendarDates[0] || selectedDate;
-        if (isShiftFinalised(dateKey(date))) {
-            alert("That pay fortnight has been finalised. Use Alpha Administration in Settings if test data needs to be removed.");
+        const existingAdded = editingAddedShiftId
+            ? Object.values(loadAddedShifts()[profileId] || {}).flat().find((item) => item?.id === editingAddedShiftId)
+            : null;
+        const unlocked = existingAdded && loadUnlockedFinalShifts().has(finalShiftUnlockKey("added", existingAdded));
+        if (isShiftFinalised(dateKey(date)) && !unlocked) {
+            alert("That pay fortnight has been finalised. Use Alpha Administration in Settings to unlock the shift for testing.");
+            return;
+        }
+        const originalDayCode = String(getShiftForDate(date).shift.code || "").toUpperCase();
+        const baseWorkingShiftCount = ["O", "A", "", "-"].includes(originalDayCode) ? 0 : 1;
+        const otherAddedShiftCount = getAddedShifts(date).filter((item) => item.id !== editingAddedShiftId).length;
+        if (baseWorkingShiftCount + otherAddedShiftCount >= 3) {
+            alert("A maximum of three worked shifts can be recorded for one day.");
             return;
         }
         const grossMinutes = calculatePaidMinutes(permanentStartTime.value, permanentFinishTime.value, 0) || 0;
         const unpaidBreakMinutes = grossMinutes > 5 * 60 ? 30 : (permanentBreak.checked ? 30 : 0);
         const entry = {
-            id, date: dateKey(date), type: "added_shift", code: chosen.code,
+            id: existingAdded?.id || id, date: dateKey(date), type: "added_shift", code: chosen.code,
             start: permanentStartTime.value, finish: permanentFinishTime.value,
             unpaidBreakMinutes,
             paidMinutes: calculatePaidMinutes(permanentStartTime.value, permanentFinishTime.value, unpaidBreakMinutes),
-            payClass: setup.employmentType === "fulltime" ? "overtime" : "extra_hours",
-            notes: permanentChangeNotes.value.trim()
+            payClass: existingAdded?.payClass || (setup.employmentType === "fulltime" ? "overtime" : "extra_hours"),
+            notes: permanentChangeNotes.value.trim(),
+            createdAt: existingAdded?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
-        addAddedShift(entry);
+        if (existingAdded) {
+            deleteAddedShiftById(existingAdded.id);
+            addAddedShift(entry);
+        } else {
+            addAddedShift(entry);
+        }
     } else if (type === "swap") {
         if (![1, 2].includes(pendingCalendarDates.length)) {
             alert("Choose one date for a same-day swap, or two dates for a linked swap.");
@@ -2141,6 +2362,7 @@ function savePermanentChange() {
     all[profileId] = records;
     localStorage.setItem(STORAGE_PERMANENT_CHANGES, JSON.stringify(all));
     permanentChangePage.classList.add("hidden");
+    editingAddedShiftId = null;
     pendingChangeAction = null;
     pendingCalendarDates = [];
     pendingLeaveType = "annual_leave";
@@ -2217,8 +2439,10 @@ function clearCasualShiftForm() {
 }
 
 function saveCasualShift() {
-    if (isShiftFinalised(dateKey(selectedDate))) {
-        alert("That pay fortnight has been finalised. Use Alpha Administration in Settings if test data needs to be removed.");
+    const editingEntryForLock = editingCasualShiftId ? getCasualShifts(selectedDate).find((item) => item.id === editingCasualShiftId) : null;
+    const unlockedForAlpha = editingEntryForLock && loadUnlockedFinalShifts().has(finalShiftUnlockKey("casual", editingEntryForLock));
+    if (isShiftFinalised(dateKey(selectedDate)) && !unlockedForAlpha) {
+        alert("That pay fortnight has been finalised. Use Alpha Administration in Settings to unlock the shift for testing.");
         return;
     }
     const standard = casualShiftCode.value === ""
@@ -2299,11 +2523,53 @@ function deleteCasualShift() {
     renderHome();
 }
 
+function loadUnlockedFinalShifts() {
+    try { return new Set(JSON.parse(localStorage.getItem(STORAGE_UNLOCKED_FINAL_SHIFTS)) || []); }
+    catch (error) { return new Set(); }
+}
+
+function saveUnlockedFinalShifts(set) {
+    localStorage.setItem(STORAGE_UNLOCKED_FINAL_SHIFTS, JSON.stringify([...set]));
+}
+
+function finalShiftUnlockKey(kind, entry) {
+    return `${kind}:${entry?.id || entry?.date || "unknown"}`;
+}
+
+function isEntryFinalised(kind, entry) {
+    if (!entry) return false;
+    if (loadUnlockedFinalShifts().has(finalShiftUnlockKey(kind, entry))) return false;
+    return isShiftFinalised(entry.date);
+}
+
+function unlockFinalisedEntry(kind, entry) {
+    const set = loadUnlockedFinalShifts();
+    set.add(finalShiftUnlockKey(kind, entry));
+    saveUnlockedFinalShifts(set);
+}
+
+function finalisationDate(dateValue) {
+    const period = getPayPeriodForDate(parseDateKey(dateValue));
+    return startOfDay(addDays(period.end, 3));
+}
+
+function finalisationCountdown(dateValue) {
+    const lockAt = finalisationDate(dateValue);
+    const ms = lockAt - new Date();
+    if (ms <= 0) return "Unlocked for Alpha testing";
+    const hours = Math.floor(ms / 3600000);
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    if (days > 0) return `${days} day${days === 1 ? "" : "s"} ${remHours} hour${remHours === 1 ? "" : "s"} till locked`;
+    const minutes = Math.max(1, Math.floor(ms / 60000));
+    if (hours > 0) return `${hours} hour${hours === 1 ? "" : "s"} till locked`;
+    return `${minutes} minute${minutes === 1 ? "" : "s"} till locked`;
+}
+
 function isShiftFinalised(dateValue, today = startOfDay(new Date())) {
     if (!dateValue) return false;
-    const period = getPayPeriodForDate(parseDateKey(dateValue));
     // Fortnight end + two full calendar days remain editable. Lock from day 3.
-    return today >= startOfDay(addDays(period.end, 3));
+    return today >= finalisationDate(dateValue);
 }
 
 function deleteCasualShiftByDate(dateValue) {

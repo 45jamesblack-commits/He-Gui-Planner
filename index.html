@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
    
-    <link rel="stylesheet" href="styles.css?v=26e">
+    <link rel="stylesheet" href="styles.css?v=27a">
 </head>
 
 <body>
@@ -200,10 +200,18 @@
     Reset Current Roster
     </button>
 
+    <h3>Appearance</h3>
+    <label for="display-theme">Display theme</label>
+    <select id="display-theme">
+        <option value="light">Light</option>
+        <option value="medium">Medium</option>
+        <option value="dark">Dark</option>
+    </select>
+
     <h3>Personal Calendar</h3>
     <p class="instructions">
         Optional. Add an ICS calendar link from Google, Apple, Samsung or another calendar service.
-        Calendar display will be tested separately.
+        Events are shown in the 7-day and Monthly views when the calendar is enabled.
     </p>
     <label for="personal-calendar-name">Calendar name</label>
     <input id="personal-calendar-name" type="text" placeholder="For example: Personal Calendar">
@@ -228,16 +236,16 @@
     <p id="personal-calendar-status" class="instructions settings-calendar-status"></p>
  
     <h3>Alpha Administration</h3>
-    <p class="instructions">Testing only. Finalised shifts are normally locked after the two-day correction period.</p>
+    <p class="instructions">Testing only. Unlock a finalised shift so it can be corrected during Alpha testing.</p>
     <button id="manage-finalised-shifts" class="secondary-button full-width">
-        Manage Finalised Shift History
+        Unlock Finalised Shift
     </button>
 
     <h3>About</h3>
 
     <p><strong>Hé Guǐ Planner</strong></p>
 
-    <p>Version 1.0 Beta 26d Test</p>
+    <p>Version 1.0 Beta 27a Test</p>
 
     <p>Created by</p>
 
@@ -461,6 +469,6 @@
 
     <script src="holidays.js?v=1"></script>
     <script src="logger.js?v=1"></script>
-    <script src="app.js?v=26e"></script>
+    <script src="app.js?v=27a"></script>
 </body>
 </html>

@@ -1043,3 +1043,104 @@ button.action-locked { opacity:.45; cursor:not-allowed; }
     min-height: 1.2em;
     margin-top: 8px;
 }
+
+/* Beta 27: Light / Medium / Dark themes */
+:root,
+:root[data-theme="medium"] {
+    color-scheme: dark;
+    --background: #101214;
+    --background-top: #20252a;
+    --card: #1b1f23;
+    --card-light: #23282e;
+    --border: #4b525a;
+    --text: #ffffff;
+    --muted: #b9c0c7;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --background: #07090b;
+    --background-top: #14181c;
+    --card: #111519;
+    --card-light: #191e23;
+    --border: #3b4249;
+    --text: #ffffff;
+    --muted: #aeb6be;
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+    --background: #eef1f4;
+    --background-top: #ffffff;
+    --card: #ffffff;
+    --card-light: #f5f7f9;
+    --border: #aeb7c0;
+    --text: #171a1d;
+    --muted: #56616b;
+}
+
+body {
+    background: radial-gradient(circle at top, var(--background-top) 0%, var(--background) 42%);
+}
+
+:root[data-theme="light"] .week-day,
+:root[data-theme="light"] .profile-tab,
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .date-choice-summary,
+:root[data-theme="light"] .roster-calendar-day.pay-fortnight-light {
+    border-color: var(--border);
+}
+
+/* Beta 27: 7-day overflow cue and personal calendar */
+.week-day { position: relative; }
+.week-overflow-dot {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.16);
+}
+.week-personal-events {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 4px;
+    color: var(--amber-light);
+    font-size: .78em;
+    line-height: 1.15;
+}
+.calendar-personal-event {
+    display: block;
+    max-width: 92%;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--amber-light);
+    font-size: .48rem;
+    font-weight: 800;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Beta 27: editable shift list */
+.delete-record-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+}
+.record-item-label { display: block; }
+.shift-lock-countdown {
+    display: block;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+.oldest-shift-item {
+    border-color: var(--amber);
+    box-shadow: inset 0 0 0 1px rgba(255,176,32,.22);
+}
+.oldest-shift-item .shift-lock-countdown { color: var(--amber-light); }
