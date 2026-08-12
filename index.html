@@ -101,6 +101,24 @@
                     min="1"
                     placeholder="For example: 56"
                 >
+
+                <label class="roster-day-help-toggle">
+                    <input id="roster-day-help-checkbox" type="checkbox">
+                    <span>I don’t know it — help me find it</span>
+                </label>
+
+                <div id="roster-day-helper" class="roster-day-helper hidden">
+                    <p class="helper-title">Help me find my roster day number</p>
+                    <p class="helper-copy">Choose your row on the roster, then tap where today appears in the four-week roster.</p>
+
+                    <div class="helper-step-label">1. My roster row</div>
+                    <div id="roster-helper-rows" class="roster-helper-rows"></div>
+
+                    <div class="helper-step-label">2. Today is</div>
+                    <div id="roster-helper-weeks" class="roster-helper-weeks"></div>
+
+                    <div id="roster-helper-result" class="roster-helper-result">Select a row and today’s position.</div>
+                </div>
                 </div>
 
                 <button id="check-setup" class="primary-button">
@@ -167,10 +185,14 @@
                 </button>
             </div>
 
-            <section class="week-section">
-                <h2>Next 7 Days</h2>
+            <section id="week-section" class="week-section">
+                <div class="week-section-heading">
+                    <h2>Next 7 Days</h2>
+                    <button id="hide-week-button" class="week-hide-button" type="button" aria-label="Hide 7-day roster" title="Hide 7-day roster">‹</button>
+                </div>
                 <div id="week-list" class="week-list"></div>
             </section>
+            <button id="show-week-button" class="week-show-tab hidden" type="button" aria-label="Show 7-day roster">7 Day ›</button>
 
             <button id="print-roster" class="secondary-button full-width">
                 Print Roster Grid

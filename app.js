@@ -16,6 +16,7 @@ const STORAGE_PERSONAL_CALENDAR = "heguiPersonalCalendar";
 const STORAGE_PERSONAL_CALENDAR_CACHE = "heguiPersonalCalendarCacheV27";
 const STORAGE_DISPLAY_THEME = "heguiDisplayTheme";
 const STORAGE_UNLOCKED_FINAL_SHIFTS = "heguiUnlockedFinalShiftsAlphaV27";
+const STORAGE_WEEK_PANEL_HIDDEN = "heguiWeekPanelHidden";
 // Set this to the deployed Cloudflare Worker URL for private ICS feeds.
 // Keep the user's secret ICS address out of the URL/query string: the app sends it in a POST body.
 const PERSONAL_CALENDAR_PROXY_URL = "https://hegui-calendar.45james-black.workers.dev";
@@ -44,6 +45,13 @@ const setupScreen = document.querySelector("#setup-screen");
 const homeScreen = document.querySelector("#home-screen");
 const rosterSelect = document.querySelector("#roster-select");
 const rosterDayInput = document.querySelector("#roster-day");
+const rosterDayHelpCheckbox = document.querySelector("#roster-day-help-checkbox");
+const rosterDayHelper = document.querySelector("#roster-day-helper");
+const rosterHelperRows = document.querySelector("#roster-helper-rows");
+const rosterHelperWeeks = document.querySelector("#roster-helper-weeks");
+const rosterHelperResult = document.querySelector("#roster-helper-result");
+let helperRosterRow = null;
+let helperRosterColumn = null;
 const plannerType = document.querySelector("#planner-type");
 const permanentSetupFields = document.querySelector("#permanent-setup-fields");
 const profileTabs = document.querySelector("#profile-tabs");
@@ -68,6 +76,9 @@ const shiftTime = document.querySelector("#shift-time");
 const rosterName = document.querySelector("#roster-name");
 const rosterPosition = document.querySelector("#roster-position");
 const weekList = document.querySelector("#week-list");
+const weekSection = document.querySelector("#week-section");
+const hideWeekButton = document.querySelector("#hide-week-button");
+const showWeekButton = document.querySelector("#show-week-button");
 const editedDot = document.querySelector("#edited-dot");
 const addEditShiftButton = document.querySelector("#add-edit-shift");
 const editShiftsListButton = document.querySelector("#edit-shifts-list");
@@ -487,6 +498,11 @@ actSchoolHolidaysCheckbox.addEventListener("change", () => {
 
 resetRosterButton.addEventListener("click", resetSetup);
 plannerType.addEventListener("change", updateSetupFields);
+rosterSelect.addEventListener("change", renderRosterDayHelper);
+rosterDayHelpCheckbox.addEventListener("change", () => {
+    rosterDayHelper.classList.toggle("hidden", !rosterDayHelpCheckbox.checked);
+    if (rosterDayHelpCheckbox.checked) renderRosterDayHelper();
+});
 addChangeApplicationButton.addEventListener("click", openChangeApplicationMenu);
 chooseLeaveButton.addEventListener("click", () => {
     changeActionPage.classList.add("hidden");
@@ -1098,6 +1114,79 @@ function fillRosterList() {
     });
 }
 
+
+const ROSTER_HELPER_DAY_LABELS = ["TH1","FR1","SA1","SU1","MO1","TU1","WE1","TH2","FR2","SA2","SU2","MO2","TU2","WE2","TH3","FR3","SA3","SU3","MO3","TU3","WE3","TH4","FR4","SA4","SU4","MO4","TU4","WE4"];
+const ROSTER_HELPER_WEEKDAY = { SU:0, MO:1, TU:2, WE:3, TH:4, FR:5, SA:6 };
+
+function renderRosterDayHelper() {
+    if (!rosterHelperRows || !rosterHelperWeeks) return;
+    const roster = rosters[Number(rosterSelect.value)];
+    const maxRows = roster ? Math.min(15, Math.ceil(roster.shifts.length / 28)) : 15;
+
+    if (helperRosterRow && helperRosterRow > maxRows) helperRosterRow = null;
+    rosterHelperRows.innerHTML = "";
+    for (let row = 1; row <= 15; row++) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = row;
+        button.disabled = row > maxRows;
+        button.classList.toggle("selected", row === helperRosterRow);
+        button.addEventListener("click", () => {
+            helperRosterRow = row;
+            renderRosterDayHelper();
+            applyRosterDayHelperSelection();
+        });
+        rosterHelperRows.appendChild(button);
+    }
+
+    rosterHelperWeeks.innerHTML = "";
+    const todayWeekday = new Date().getDay();
+    for (let week = 1; week <= 4; week++) {
+        const wrap = document.createElement("div");
+        wrap.className = "roster-helper-week";
+        const name = document.createElement("div");
+        name.className = "roster-helper-week-name";
+        name.textContent = `Week ${week}`;
+        wrap.appendChild(name);
+        const days = document.createElement("div");
+        days.className = "roster-helper-week-days";
+        ROSTER_HELPER_DAY_LABELS.forEach((label, index) => {
+            if (!label.endsWith(String(week))) return;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = label.slice(0, 2);
+            button.title = label;
+            button.classList.toggle("selected", helperRosterColumn === index + 1);
+            button.classList.toggle("today-weekday", ROSTER_HELPER_WEEKDAY[label.slice(0,2)] === todayWeekday);
+            button.addEventListener("click", () => {
+                helperRosterColumn = index + 1;
+                renderRosterDayHelper();
+                applyRosterDayHelperSelection();
+            });
+            days.appendChild(button);
+        });
+        wrap.appendChild(days);
+        rosterHelperWeeks.appendChild(wrap);
+    }
+    applyRosterDayHelperSelection(false);
+}
+
+function applyRosterDayHelperSelection(updateInput = true) {
+    if (!helperRosterRow || !helperRosterColumn) {
+        rosterHelperResult.textContent = "Select a row and today’s position.";
+        return;
+    }
+    const rosterDay = (helperRosterRow - 1) * 28 + helperRosterColumn;
+    const roster = rosters[Number(rosterSelect.value)];
+    const label = ROSTER_HELPER_DAY_LABELS[helperRosterColumn - 1];
+    if (roster && rosterDay > roster.shifts.length) {
+        rosterHelperResult.textContent = `That position is outside the selected roster.`;
+        return;
+    }
+    if (updateInput) rosterDayInput.value = rosterDay;
+    rosterHelperResult.textContent = `Row ${helperRosterRow} · ${label} → roster day ${rosterDay}`;
+}
+
 function beginSetupCheck() {
     if (plannerType.value === "casual") {
         setup = { type: "casual" };
@@ -1282,6 +1371,23 @@ function renderHoliday(date) {
         : "";
     publicHoliday.classList.toggle("hidden", !holidayName);
 }
+
+function setWeekPanelHidden(hidden, persist = true) {
+    if (!weekSection || !showWeekButton) return;
+    weekSection.classList.toggle("week-section-hidden", hidden);
+    showWeekButton.classList.toggle("hidden", !hidden);
+    if (hideWeekButton) hideWeekButton.setAttribute("aria-expanded", String(!hidden));
+    if (persist) localStorage.setItem(STORAGE_WEEK_PANEL_HIDDEN, hidden ? "1" : "0");
+}
+
+if (hideWeekButton) {
+    hideWeekButton.addEventListener("click", () => setWeekPanelHidden(true));
+}
+if (showWeekButton) {
+    showWeekButton.addEventListener("click", () => setWeekPanelHidden(false));
+}
+
+setWeekPanelHidden(localStorage.getItem(STORAGE_WEEK_PANEL_HIDDEN) === "1", false);
 
 function renderWeek() {
     weekList.innerHTML = "";
@@ -2870,6 +2976,21 @@ function resetSetup() {
 
     rosterSelect.value = "";
     rosterDayInput.value = "";
+
+    // A full roster reset returns the 7-day panel to its normal visible state.
+    localStorage.removeItem(STORAGE_WEEK_PANEL_HIDDEN);
+    setWeekPanelHidden(false, false);
+
+    // Reset the optional roster-day helper as well, so a fresh setup
+    // never reuses the previous row/position selection.
+    helperRosterRow = null;
+    helperRosterColumn = null;
+    if (rosterDayHelpCheckbox) rosterDayHelpCheckbox.checked = false;
+    if (rosterDayHelper) rosterDayHelper.classList.add("hidden");
+    if (rosterHelperRows) rosterHelperRows.innerHTML = "";
+    if (rosterHelperWeeks) rosterHelperWeeks.innerHTML = "";
+    if (rosterHelperResult) rosterHelperResult.textContent = "Select a row and today’s position.";
+
     plannerType.value = "fulltime";
     updateSetupFields();
 }
@@ -2977,285 +3098,273 @@ function formatClockTime(value) {
 
 function printRosterGrid() {
     const roster = rosters[setup.rosterIndex];
-    const positionsPerLine = 28;
-    const numberOfLines = Math.ceil(
-        roster.shifts.length / positionsPerLine
-    );
+    const existing = document.querySelector(".print-options-overlay");
+    if (existing) existing.remove();
 
-    const anchorDate = parseDateKey(setup.anchorDate);
-    const rosterOneDate = addDays(
-        anchorDate,
-        -(setup.anchorPosition - 1)
-    );
+    const today = startOfDay(new Date());
+    const anchor = new Date(2026, 6, 30); // Thu 30 Jul 2026
+    const diffDays = Math.floor((today - anchor) / 86400000);
+    const currentBlockIndex = Math.floor(diffDays / 28);
+    const currentBlockStart = addDays(anchor, currentBlockIndex * 28);
 
-    const weekdayHeadings = [];
+    const overlay = document.createElement("div");
+    overlay.className = "print-options-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:10000;background:#ececec;display:grid;grid-template-columns:minmax(210px,260px) 1fr;font-family:Arial,sans-serif;color:#111";
 
-    for (let column = 0; column < positionsPerLine; column += 1) {
-        weekdayHeadings.push(
-            addDays(rosterOneDate, column)
-                .toLocaleDateString("en-AU", {
-                    weekday: "short"
-                })
-                .slice(0, 2)
-        );
-    }
+    overlay.innerHTML = `
+      <aside class="print-settings-panel" style="background:#fff;border-right:1px solid #c8c8c8;padding:18px;overflow:auto">
+        <div style="font-size:22px;font-weight:900;margin-bottom:5px">HÉ GUǏ PLANNER</div>
+        <div style="font-size:12px;line-height:1.35;margin-bottom:18px;color:#444">
+          Personal planning tool. Compare this grid with your employer’s official roster.
+        </div>
 
-    let rowsHtml = "";
+        <div style="border-top:1px solid #aaa;padding-top:15px">
+          <h2 style="font-size:16px;margin:0 0 14px">PRINT SETTINGS</h2>
 
-    for (let line = 0; line < numberOfLines; line += 1) {
-        let cells = "";
+          <label style="display:block;margin-bottom:14px">
+            <strong>Print Type</strong><br>
+            <select id="print-test-type" style="width:100%;margin-top:6px;padding:10px;font:inherit">
+              <option value="dated" selected>Dated Roster</option>
+              <option value="block">Roster</option>
+            </select>
+          </label>
 
-        for (let column = 0; column < positionsPerLine; column += 1) {
-            const index = line * positionsPerLine + column;
-            const shift = roster.shifts[index];
+          <label id="print-start-wrap" style="display:block;margin-bottom:14px">
+            <strong>Start</strong><br>
+            <select id="print-test-start" style="width:100%;margin-top:6px;padding:10px;font:inherit"></select>
+          </label>
 
-                        cells += `
-                <td class="${shift ? shiftClass(shift.code) : "unused"}">
-                    <span class="position-number">
-                        ${shift ? index + 1 : ""}
-                    </span>
+          <label id="print-count-wrap" style="display:block;margin-bottom:14px">
+            <strong>Months</strong><br>
+            <select id="print-test-count" style="width:100%;margin-top:6px;padding:10px;font:inherit"></select>
+          </label>
 
-                    <span class="position-shift">
-                        ${shift ? escapeHtml(shift.code) : ""}
-                    </span>
-                </td>
-            `;
-        }
+          <label id="print-theme-wrap" style="display:block;margin-bottom:14px">
+            <strong>Theme</strong><br>
+            <select id="print-test-theme" style="width:100%;margin-top:6px;padding:10px;font:inherit">
+              <option value="plain" selected>Plain</option>
+              <option value="cars">Cars</option>
+              <option value="cats">Cats</option>
+            </select>
+          </label>
 
-        rowsHtml += `
-            <tr>
-                <th class="line-number">${line + 1}</th>
-                ${cells}
-            </tr>
-        `;
-    }
-   
+          <label id="print-fade-wrap" style="display:flex;gap:9px;align-items:flex-start;margin:4px 0 15px">
+            <input id="print-test-fade" type="checkbox" checked style="margin-top:2px">
+            <span>Fade completed dates to 30%</span>
+          </label>
 
-    const weekdayCells = weekdayHeadings
-        .map(day => `<th>${escapeHtml(day)}</th>`)
-        .join("");
+          <div id="print-info" style="padding:11px;border-radius:9px;background:#f3f3f3;font-size:12px;line-height:1.4;margin-bottom:16px"></div>
 
-    const existingPreview =
-        document.querySelector(".print-preview-overlay");
+          <button id="print-test-print" type="button" style="width:100%;padding:12px 14px;border:0;border-radius:10px;background:#ffb020;font-weight:900;font:inherit;margin-bottom:9px">
+            Print or Save PDF
+          </button>
+          <button id="print-test-cancel" type="button" style="width:100%;padding:12px 14px;border:1px solid #555;border-radius:10px;background:#252a30;color:#fff;font-weight:900;font:inherit">
+            Back to Hé Guǐ
+          </button>
+        </div>
+      </aside>
 
-    if (existingPreview) {
-        existingPreview.remove();
-    }
+      <main style="min-width:0;overflow:auto;padding:16px">
+        <iframe id="print-test-frame" style="width:100%;height:100%;min-height:720px;border:1px solid #bbb;background:#fff;box-shadow:0 3px 16px rgba(0,0,0,.12)"></iframe>
+      </main>`;
 
-    const previewOverlay = document.createElement("div");
-    const previewToolbar = document.createElement("div");
-    const printButton = document.createElement("button");
-    const backButton = document.createElement("button");
-    const previewFrame = document.createElement("iframe");
-
-    previewOverlay.className = "print-preview-overlay";
-    previewOverlay.style.cssText = [
-        "position:fixed",
-        "inset:0",
-        "z-index:10000",
-        "display:flex",
-        "flex-direction:column",
-        "background:#f2f2f2"
-    ].join(";");
-
-    previewToolbar.style.cssText = [
-        "display:flex",
-        "flex-wrap:wrap",
-        "gap:10px",
-        "padding:12px",
-        "background:#101214",
-        "box-shadow:0 2px 8px rgba(0,0,0,.35)"
-    ].join(";");
-
-    printButton.type = "button";
-    printButton.textContent = "Print or Save PDF";
-    printButton.style.cssText = [
-        "min-height:46px",
-        "padding:0 18px",
-        "border:0",
-        "border-radius:10px",
-        "background:#ffb020",
-        "color:#101214",
-        "font:inherit",
-        "font-weight:800"
-    ].join(";");
-
-    backButton.type = "button";
-    backButton.textContent = "Back to Hé Guǐ";
-    backButton.style.cssText = [
-        "min-height:46px",
-        "padding:0 18px",
-        "border:1px solid #4b525a",
-        "border-radius:10px",
-        "background:#23282e",
-        "color:#fff",
-        "font:inherit",
-        "font-weight:800"
-    ].join(";");
-
-    previewFrame.title = "Roster print preview";
-    previewFrame.style.cssText = [
-        "width:100%",
-        "flex:1",
-        "border:0",
-        "background:#fff"
-    ].join(";");
-
-    printButton.addEventListener("click", () => {
-        logHeguiEvent("print_roster", {
-        roster: roster.name,
-        action: "print_or_save_pdf"
-    });
-        previewFrame.contentWindow?.focus();
-        previewFrame.contentWindow?.print();
-    });
-
-    backButton.addEventListener("click", () => {
-        previewOverlay.remove();
-        document.body.style.overflow = "";
-    });
-
-    previewToolbar.append(printButton, backButton);
-    previewOverlay.append(previewToolbar, previewFrame);
-    document.body.appendChild(previewOverlay);
+    document.body.appendChild(overlay);
     document.body.style.overflow = "hidden";
 
-    previewFrame.srcdoc = `
-        <!DOCTYPE html>
-        <html lang="en-AU">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>${escapeHtml(roster.name)} Roster</title>
+    const type = overlay.querySelector("#print-test-type");
+    const startSelect = overlay.querySelector("#print-test-start");
+    const count = overlay.querySelector("#print-test-count");
+    const fade = overlay.querySelector("#print-test-fade");
+    const theme = overlay.querySelector("#print-test-theme");
+    const frame = overlay.querySelector("#print-test-frame");
+    const info = overlay.querySelector("#print-info");
 
-            <style>
-                @page {
-                    size: A4 landscape;
-                    margin: 9mm;
+    for (let i = -2; i <= 12; i++) {
+        const d = addDays(currentBlockStart, i * 28);
+        const label = `${i === 0 ? "Current — " : ""}${d.toLocaleDateString("en-AU", {
+            day: "2-digit", month: "short", year: "2-digit"
+        })}`;
+        const opt = new Option(label, `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+        if (i === 0) opt.selected = true;
+        startSelect.add(opt);
+    }
+
+    const maxMonthsOnPage = 8;
+    for (let i = 1; i <= maxMonthsOnPage; i++) {
+        count.add(new Option(`${i} Month Roster${i === 1 ? "" : "s"}`, String(i)));
+    }
+    count.value = "3";
+
+    function buildPrintDocument() {
+        if (type.value === "block") {
+            return buildRosterPrintDocument(roster, { block: true, theme: theme.value });
+        }
+
+        const [y,m,d] = startSelect.value.split("-").map(Number);
+        return buildRosterPrintDocument(roster, {
+            block: false,
+            firstThursday: new Date(y, m-1, d),
+            lineCount: Number(count.value),
+            fadePast: fade.checked,
+            theme: theme.value
+        });
+    }
+
+    function refreshPreview() {
+        const dated = type.value === "dated";
+        overlay.querySelector("#print-start-wrap").style.display = dated ? "block" : "none";
+        overlay.querySelector("#print-count-wrap").style.display = dated ? "block" : "none";
+        overlay.querySelector("#print-fade-wrap").style.display = dated ? "flex" : "none";
+
+        if (dated) {
+            const [y,m,d] = startSelect.value.split("-").map(Number);
+            const start = new Date(y,m-1,d);
+            const end = addDays(start, Number(count.value) * 28 - 1);
+            info.innerHTML = `<strong>Dated Roster</strong><br>${start.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"2-digit"})} – ${end.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"2-digit"})}`;
+        } else {
+            info.innerHTML = `<strong>Roster</strong><br>Repeating roster pattern. No calendar dates.`;
+        }
+
+        frame.srcdoc = buildPrintDocument();
+    }
+
+    type.addEventListener("change", refreshPreview);
+    startSelect.addEventListener("change", refreshPreview);
+    count.addEventListener("change", refreshPreview);
+    fade.addEventListener("change", refreshPreview);
+    theme.addEventListener("change", refreshPreview);
+
+    overlay.querySelector("#print-test-print").onclick = () => {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+    };
+
+    overlay.querySelector("#print-test-cancel").onclick = () => {
+        overlay.remove();
+        document.body.style.overflow = "";
+    };
+
+    refreshPreview();
+}
+
+function buildRosterPrintDocument(roster, options) {
+    const today = startOfDay(new Date());
+    let content = "";
+
+    // Theme artwork is confined to shallow header/footer zones.
+    let headerArt = "";
+    let footerArt = "";
+    if (options.theme === "cars") {
+        headerArt = `<div class="art-zone art-header cars"><span>◆</span><span> MOTOR </span><span>◆</span><span> DRIVE </span><span>◆</span></div>`;
+        footerArt = `<div class="art-zone art-footer cars"><span>◆ ◆ ◆</span></div>`;
+    } else if (options.theme === "cats") {
+        headerArt = `<div class="art-zone art-header cats"><span>◢◣ •ᴗ• ◢◣</span><span> ● ● </span><span>◢◣ •ᴗ• ◢◣</span></div>`;
+        footerArt = `<div class="art-zone art-footer cats"><span>●  ●  ●  ●  ●</span></div>`;
+    }
+    if (options.block) {
+        const rowCount = Math.ceil(roster.shifts.length / 28);
+        const weekdayCycle = ["Thu","Fri","Sat","Sun","Mon","Tue","Wed"];
+        let weekdayHeader = "";
+        for (let i=0;i<28;i++) weekdayHeader += `<th>${weekdayCycle[i % 7]}</th>`;
+
+        let rows = "";
+        for (let row=0; row<rowCount; row++) {
+            let numCells = "";
+            let shiftCells = "";
+            for (let col=0; col<28; col++) {
+                const idx = row*28 + col;
+                const shift = roster.shifts[idx];
+                if (shift) {
+                    numCells += `<td class="position">${escapeHtml(String(shift.number))}</td>`;
+                    shiftCells += `<td class="shift"><strong>${escapeHtml(shift.code)}</strong></td>`;
+                } else {
+                    numCells += "<td></td>";
+                    shiftCells += "<td></td>";
                 }
+            }
+            rows += `<tr><th class="line-label" rowspan="2">${row+1}</th>${numCells}</tr><tr>${shiftCells}</tr>`;
+        }
 
-                body {
-                    margin: 0 auto;
-                    max-width: 1200px;
-                    padding: 16px;
-                    color: #111;
-                    font-family: Arial, sans-serif;
-                }
+        content = `<section class="block-roster"><h2>Roster</h2><table><thead><tr><th class="line-label">Line</th>${weekdayHeader}</tr></thead><tbody>${rows}</tbody></table></section>`;
+    } else {
+        for (let line=0; line<options.lineCount; line++) {
+            const lineStart = addDays(options.firstThursday, line*28);
+            const lineEnd = addDays(lineStart, 27);
 
-                h1 {
-                    margin: 0 0 4px;
-                    font-size: 20px;
-                }
+            let ddd="", dates="", shifts="";
+            for (let i=0;i<28;i++) {
+                const date = addDays(lineStart, i);
+                const past = options.fadePast && date < today;
+                const isToday = date.getTime() === today.getTime();
+                const cls = `${past ? "past" : ""} ${isToday ? "today" : ""}`;
 
-                .details {
-                    margin-bottom: 10px;
-                    font-size: 11px;
-                }
+                const code = rosterCalendarCode(date);
+                const added = rosterCalendarAddedCodes(date);
+                const shown = [code, ...added].filter(Boolean).slice(0,3).join("/");
 
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    table-layout: fixed;
-                }
+                ddd += `<td class="${cls}">${date.toLocaleDateString("en-AU",{weekday:"short"}).slice(0,3)}</td>`;
+                dates += `<td class="${cls}">${date.getDate()}</td>`;
+                shifts += `<td class="${cls}"><strong>${escapeHtml(shown)}</strong></td>`;
+            }
 
-                th,
-                td {
-                    height: 27px;
-                    padding: 2px;
-                    border: 1px solid #555;
-                    font-size: 10px;
-                    font-weight: 700;
-                    text-align: center;
-                }
+            content += `<section class="dated-line"><h2>${lineStart.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})} — ${lineEnd.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}</h2><table><tr class="ddd-row">${ddd}</tr><tr class="date-row">${dates}</tr><tr class="shift-row">${shifts}</tr></table></section>`;
+        }
+    }
 
-                thead th {
-                    background: #e7e7e7;
-                }
+    return `<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>${escapeHtml(roster.name)} Print</title>
+<style>
+  @page{size:A4 landscape;margin:7mm}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,sans-serif;color:#111;background:#fff}
+  header{display:flex;justify-content:space-between;align-items:end;margin-bottom:2.2mm}
+  h1{font-size:19pt;margin:0}.sub{font-size:9.5pt}
+  h2{font-size:9pt;margin:0 0 .45mm;text-align:center}
+  table{border-collapse:collapse;table-layout:fixed;width:78%;min-width:78%;max-width:78%;margin-left:auto;margin-right:auto}
+  th,td{border:1px solid #777;text-align:center;padding:.4mm .05mm}
+  .block-roster .line-label{width:8mm;background:#222;color:#fff;font-size:7.5pt}
+  .block-roster thead th:not(.line-label){background:#e7e7e7;font-size:7pt;height:5.5mm}
+  .block-roster .position{font-size:7.2pt;height:5.2mm}
+  .block-roster .shift{font-size:9.5pt;height:6.8mm}
 
-                .position-number {
-                    display: block;
-                    margin-bottom: 3px;
-                    color: #555;
-                    font-size: 8px;
-                    font-weight: 600;
-                }
+  .dated-line{break-inside:avoid;margin:0 0 .45mm}
+  .dated-line .ddd-row td{font-size:8.4pt;height:5.1mm;background:#e7e7e7;font-weight:700}
+  .dated-line .date-row td{font-size:8.4pt;height:5.1mm;font-weight:700}
+  .dated-line .shift-row td{font-size:8.4pt;height:5.5mm;font-weight:700}
 
-                .position-shift {
-                    display: block;
-                    font-size: 11px;
-                    font-weight: 800;
-                }
+  .past{opacity:.30}
+  .today{opacity:1!important;outline:1.5px solid #111;outline-offset:-1.5px}
+  .art-zone{
+    width:78%;margin-left:auto;margin-right:auto;display:flex;align-items:center;
+    justify-content:space-around;overflow:hidden;font-weight:800;color:#555
+  }
+  .art-header{height:6mm;margin-bottom:1.2mm;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-size:7.5pt}
+  .art-footer{height:4mm;margin-top:1mm;border-top:1px solid #ccc;font-size:6.5pt}
+  .art-zone.cars{font-style:italic;letter-spacing:1mm}
+  .art-zone.cats{letter-spacing:.5mm}
+  footer{margin-top:2mm;font-size:7pt;color:#555}
 
-                .line-number {
-                    width: 25px;
-                    background: #222;
-                    color: white;
-                }
-
-                th:nth-child(7n + 2),
-                td:nth-child(7n + 2) {
-                    border-left-width: 2px;
-                }
-
-                .off {
-                    background: #d9d9d9;
-                }
-
-                .ado {
-                    background: #c9ddff;
-                    color: #073b83;
-                }
-
-                .unused {
-                    background: #eeeeee;
-                }
-
-                .notice {
-                    margin-top: 9px;
-                    font-size: 9px;
-                }
-
-                @media print {
-                    body {
-                        max-width: none;
-                        padding: 0;
-                    }
-
-                }
-            </style>
-        </head>
-
-        <body>
-            <h1>${escapeHtml(roster.name)}</h1>
-
-            <div class="details">
-                ${roster.shifts.length} roster positions ·
-                Printed ${escapeHtml(formatAustralianDate(new Date()))}
-            </div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Line</th>
-                        ${weekdayCells}
-                    </tr>
-                    
-                </thead>
-
-                <tbody>
-                    ${rowsHtml}
-                </tbody>
-                
-            </table>
-
-            <p class="notice">
-                Personal planning tool. Compare this grid with your
-                employer’s official roster. Workplace roster changes
-                must be confirmed with management.
-            </p>
-        </body>
-        </html>
-    `;
+  @media print{
+    body{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>${escapeHtml(roster.name)}</h1>
+    <div class="sub">${roster.shifts.length} roster positions · Printed ${new Date().toLocaleDateString("en-AU")}</div>
+  </div>
+  <div class="sub">HÉ GUǏ PLANNER</div>
+</header>
+${headerArt}
+${content}\n<footer>Personal planning tool. Compare this grid with your employer’s official roster. Workplace roster changes must be confirmed with management.</footer>
+</body>
+</html>`;
 }
 
 function shiftClass(code) {
