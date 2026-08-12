@@ -1244,3 +1244,62 @@ body {
 .roster-helper-week-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .roster-helper-weeks button.today-weekday { border-width: 2px; }
 .roster-helper-result { margin-top: 12px; padding: 9px; border-radius: 8px; background: var(--card); font-weight: 800; text-align: center; }
+
+
+/* --- Mobile-safe 7-day slide control --- */
+.week-section-heading {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+}
+
+.week-section-heading h2 {
+    flex: 1 1 auto;
+    margin: 0 12px 12px 0 !important;
+}
+
+.week-hide-button {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 44px !important;
+    margin: 0 0 12px 0 !important;
+    position: relative;
+    z-index: 5;
+    touch-action: manipulation;
+    cursor: pointer;
+}
+
+.week-show-tab {
+    position: relative;
+    z-index: 5;
+    min-width: 92px;
+    min-height: 44px;
+    touch-action: manipulation;
+    cursor: pointer;
+}
+
+@media (max-width: 700px) {
+    .week-section {
+        width: 100%;
+    }
+
+    .week-section-heading {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+    }
+
+    .week-hide-button {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .week-show-tab:not(.hidden) {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+}

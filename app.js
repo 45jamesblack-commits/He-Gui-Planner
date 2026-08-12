@@ -1381,10 +1381,27 @@ function setWeekPanelHidden(hidden, persist = true) {
 }
 
 if (hideWeekButton) {
-    hideWeekButton.addEventListener("click", () => setWeekPanelHidden(true));
+    const hideWeek = (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        setWeekPanelHidden(true);
+    };
+    hideWeekButton.addEventListener("click", hideWeek);
+    hideWeekButton.addEventListener("touchend", hideWeek, { passive: false });
 }
+
 if (showWeekButton) {
-    showWeekButton.addEventListener("click", () => setWeekPanelHidden(false));
+    const showWeek = (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        setWeekPanelHidden(false);
+    };
+    showWeekButton.addEventListener("click", showWeek);
+    showWeekButton.addEventListener("touchend", showWeek, { passive: false });
 }
 
 setWeekPanelHidden(localStorage.getItem(STORAGE_WEEK_PANEL_HIDDEN) === "1", false);
