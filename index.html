@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
    
-    <link rel="stylesheet" href="styles.css?v=27b">
+    <link rel="stylesheet" href="styles.css?v=28">
 </head>
 
 <body>
@@ -267,7 +267,7 @@
 
     <p><strong>Hé Guǐ Planner</strong></p>
 
-    <p>Version 1.0 Beta 27b Test</p>
+    <p>Version 1.0 Beta 28 Test</p>
 
     <p>Created by</p>
 
@@ -352,6 +352,7 @@
             <div><label for="permanent-start-time">Start</label><input id="permanent-start-time" type="time"></div>
             <div><label for="permanent-finish-time">Finish</label><input id="permanent-finish-time" type="time"></div>
         </div>
+        <div id="permanent-auto-adjust-markers" class="auto-adjust-markers hidden" aria-live="polite"></div>
         <label class="break-option" for="permanent-break"><input id="permanent-break" type="checkbox"><span>Unpaid break — 30 minutes</span></label>
     </div>
     <div id="swap-date-field" class="hidden">
@@ -361,6 +362,7 @@
     <label for="permanent-change-notes">Notes (optional)</label>
     <textarea id="permanent-change-notes" rows="3" maxlength="300"></textarea>
     <button id="save-permanent-change" class="primary-button">Save Change</button>
+    <button id="save-permanent-change-add-another" class="secondary-button full-width hidden">Save &amp; Add Another</button>
     <button id="cancel-permanent-change" class="secondary-button full-width">Cancel</button>
 </section>
 
@@ -419,6 +421,7 @@
             <input id="casual-finish-time" type="time" required>
         </div>
     </div>
+    <div id="casual-auto-adjust-markers" class="auto-adjust-markers hidden" aria-live="polite"></div>
 
     <label class="break-option" for="casual-break">
         <input id="casual-break" type="checkbox">
@@ -436,8 +439,34 @@
     <textarea id="casual-notes" rows="4" maxlength="300"></textarea>
 
     <button id="save-casual-shift" class="primary-button">Save Shift</button>
+    <button id="save-casual-shift-add-another" class="secondary-button full-width hidden">Save &amp; Add Another</button>
     <button id="delete-casual-editor" class="secondary-button full-width hidden">Delete Shift</button>
     <button id="cancel-casual-shift" class="secondary-button full-width">Cancel</button>
+</section>
+
+<section id="availability-test-page" class="modal-page hidden availability-test-page">
+    <div class="availability-test-head">
+        <div>
+            <h2>Availability — Test</h2>
+            <p class="instructions">Landscape fortnight view · 05:00–21:00 · 30-minute intervals</p>
+        </div>
+        <button id="close-availability-test" class="secondary-button">Back</button>
+    </div>
+    <div class="availability-test-toolbar">
+        <div class="availability-control-group" aria-label="Availability marking controls">
+            <button id="availability-mark-available" class="availability-mode-button active" type="button">Mark Available</button>
+            <button id="availability-mark-unavailable" class="availability-mode-button" type="button">Mark Unavailable</button>
+            <button id="availability-clear-day" class="availability-mode-button" type="button">Clear Day</button>
+        </div>
+        <div class="availability-test-legend">
+            <span><b>Legend:</b></span>
+            <span class="availability-legend available">Available</span>
+            <span class="availability-legend rostered">Rostered / Working</span>
+            <span class="availability-legend unavailable">Unavailable</span>
+        </div>
+        <p class="availability-test-hint">Choose a control, then tap 30-minute blocks. Rostered blocks cannot be changed. This test data is temporary.</p>
+    </div>
+    <div id="availability-test-grid" class="availability-grid"></div>
 </section>
 
 <section id="extras-page" class="modal-page hidden">
@@ -476,6 +505,8 @@
 
     <br><br>
 
+    <button id="open-availability-test" class="secondary-button full-width">Availability Test</button>
+
     <button id="close-extras" class="primary-button">
         Close
     </button>
@@ -491,6 +522,6 @@
 
     <script src="holidays.js?v=1"></script>
     <script src="logger.js?v=1"></script>
-    <script src="app.js?v=27b"></script>
+    <script src="app.js?v=28"></script>
 </body>
 </html>

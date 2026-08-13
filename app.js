@@ -120,6 +120,8 @@ const chooseEditShiftsButton = document.querySelector("#choose-edit-shifts");
 const chooseManagementChangeButton = document.querySelector("#choose-management-change");
 const deleteSwapGlobalButton = document.querySelector("#delete-swap-global");
 const deleteAddedShiftGlobalButton = document.querySelector("#delete-added-shift-global");
+const savePermanentChangeAddAnotherButton = document.querySelector("#save-permanent-change-add-another");
+const saveCasualShiftAddAnotherButton = document.querySelector("#save-casual-shift-add-another");
 const deleteManagementGlobalButton = document.querySelector("#delete-management-global");
 const deleteRecordPage = document.querySelector("#delete-record-page");
 const deleteRecordTitle = document.querySelector("#delete-record-title");
@@ -149,9 +151,139 @@ const swapDayOffDate = document.querySelector("#swap-day-off-date");
 const calendarSameDayOption = document.querySelector("#calendar-same-day-option");
 const calendarSameDaySwap = document.querySelector("#calendar-same-day-swap");
 const permanentChangeNotes = document.querySelector("#permanent-change-notes");
+const permanentAutoAdjustMarkers = document.querySelector("#permanent-auto-adjust-markers");
+const casualAutoAdjustMarkers = document.querySelector("#casual-auto-adjust-markers");
+
+const availabilityTestPage = document.querySelector("#availability-test-page");
+const availabilityTestGrid = document.querySelector("#availability-test-grid");
+const openAvailabilityTestButton = document.querySelector("#open-availability-test");
+const closeAvailabilityTestButton = document.querySelector("#close-availability-test");
+const availabilityMarkAvailableButton = document.querySelector("#availability-mark-available");
+const availabilityMarkUnavailableButton = document.querySelector("#availability-mark-unavailable");
+const availabilityClearDayButton = document.querySelector("#availability-clear-day");
+
 
 const resetRosterButton =
     document.querySelector("#reset-roster");
+
+
+function availabilityTestRosterInterval(date) {
+    if (!setup || setup.type === "casual") return null;
+    const shift = getShiftForDate(date).shift;
+    const code = String(shift?.code || "").toUpperCase();
+    if (["O", "A", "", "-"].includes(code)) return null;
+    const parts = String(shift?.time || "").split("-");
+    if (parts.length !== 2) return null;
+    const start = shiftClockMinutes(parts[0]);
+    const finish = shiftClockMinutes(parts[1]);
+    if (start === null || finish === null) return null;
+    return { start, finish, code };
+}
+
+let availabilityTestMode = "available";
+const availabilityTestSelections = {};
+
+function setAvailabilityTestMode(mode) {
+    availabilityTestMode = mode;
+    availabilityMarkAvailableButton?.classList.toggle("active", mode === "available");
+    availabilityMarkUnavailableButton?.classList.toggle("active", mode === "unavailable");
+}
+
+function availabilityTestKey(date, slot) {
+    return `${dateKey(date)}|${slot}`;
+}
+
+function renderAvailabilityTest() {
+    if (!availabilityTestGrid) return;
+    const period = getPayPeriodForDate(selectedDate || new Date());
+    const dates = Array.from({ length: 14 }, (_, i) => addDays(period.start, i));
+    const startMinute = 5 * 60;
+    const finishMinute = 21 * 60;
+    const slots = [];
+    for (let m = startMinute; m < finishMinute; m += 30) slots.push(m);
+
+    const timeLabel = (m) => {
+        const h = Math.floor(m / 60);
+        const min = m % 60;
+        return `${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`;
+    };
+
+    let html = `<div class="availability-corner">Time</div>`;
+    dates.forEach((date, dayIndex) => {
+        html += `<div class="availability-day-head" data-day-index="${dayIndex}">
+            <strong>${date.toLocaleDateString("en-AU",{weekday:"short"})}</strong>
+            <span>${date.toLocaleDateString("en-AU",{day:"2-digit",month:"2-digit"})}</span>
+            <button type="button" class="availability-all-day" data-date="${dateKey(date)}">Available all day</button>
+        </div>`;
+    });
+
+    slots.forEach((slot) => {
+        html += `<div class="availability-time">${timeLabel(slot)}</div>`;
+        dates.forEach((date) => {
+            const roster = availabilityTestRosterInterval(date);
+            const rostered = roster && slot < roster.finish && (slot + 30) > roster.start;
+            const key = availabilityTestKey(date, slot);
+            const selectedState = availabilityTestSelections[key];
+            const state = rostered ? "rostered" : (selectedState || "neutral");
+            const title = rostered ? `${roster.code} rostered — cannot change` :
+                `${timeLabel(slot)}–${timeLabel(slot + 30)} · ${state === "neutral" ? "Not marked" : state}`;
+            html += `<button type="button" class="availability-slot ${state}" data-date="${dateKey(date)}" data-slot="${slot}" ${rostered ? "disabled" : ""} title="${title}" aria-label="${title}"></button>`;
+        });
+    });
+    availabilityTestGrid.innerHTML = html;
+
+    availabilityTestGrid.querySelectorAll(".availability-slot:not(:disabled)").forEach((button) => {
+        button.addEventListener("click", () => {
+            const key = `${button.dataset.date}|${button.dataset.slot}`;
+            availabilityTestSelections[key] = availabilityTestMode;
+            button.classList.remove("neutral", "available", "unavailable");
+            button.classList.add(availabilityTestMode);
+        });
+    });
+
+    availabilityTestGrid.querySelectorAll(".availability-all-day").forEach((button) => {
+        button.addEventListener("click", () => {
+            const targetDate = parseDateKey(button.dataset.date);
+            slots.forEach((slot) => {
+                const roster = availabilityTestRosterInterval(targetDate);
+                const rostered = roster && slot < roster.finish && (slot + 30) > roster.start;
+                if (!rostered) availabilityTestSelections[availabilityTestKey(targetDate, slot)] = "available";
+            });
+            renderAvailabilityTest();
+        });
+    });
+}
+
+availabilityMarkAvailableButton?.addEventListener("click", () => setAvailabilityTestMode("available"));
+availabilityMarkUnavailableButton?.addEventListener("click", () => setAvailabilityTestMode("unavailable"));
+
+availabilityClearDayButton?.addEventListener("click", () => {
+    const answer = prompt("Clear which date? Enter DD/MM (for example 14/08).");
+    if (!answer) return;
+    const period = getPayPeriodForDate(selectedDate || new Date());
+    const dates = Array.from({ length: 14 }, (_, i) => addDays(period.start, i));
+    const match = dates.find((date) => date.toLocaleDateString("en-AU",{day:"2-digit",month:"2-digit"}) === answer.trim());
+    if (!match) {
+        alert("That date is not in this fortnight.");
+        return;
+    }
+    Object.keys(availabilityTestSelections).forEach((key) => {
+        if (key.startsWith(`${dateKey(match)}|`)) delete availabilityTestSelections[key];
+    });
+    renderAvailabilityTest();
+});
+
+openAvailabilityTestButton?.addEventListener("click", () => {
+    document.querySelector("#extras-page")?.classList.add("hidden");
+    setAvailabilityTestMode("available");
+    renderAvailabilityTest();
+    availabilityTestPage?.classList.remove("hidden");
+});
+
+closeAvailabilityTestButton?.addEventListener("click", () => {
+    availabilityTestPage?.classList.add("hidden");
+    document.querySelector("#extras-page")?.classList.remove("hidden");
+});
 
 function applyDisplayTheme(theme) {
     const allowed = new Set(["light", "medium", "dark"]);
@@ -574,7 +706,8 @@ calendarSameDaySwap.addEventListener("change", () => { pendingCalendarDates = []
 permanentChangeType.addEventListener("change", updatePermanentChangeFields);
 swapType.addEventListener("change", updatePermanentChangeFields);
 permanentShiftCode.addEventListener("change", fillPermanentShiftTimes);
-document.querySelector("#save-permanent-change").addEventListener("click", savePermanentChange);
+document.querySelector("#save-permanent-change").addEventListener("click", () => savePermanentChange(false));
+savePermanentChangeAddAnotherButton.addEventListener("click", () => savePermanentChange(true));
 document.querySelector("#cancel-permanent-change").addEventListener("click", closePermanentChangeEditor);
 editChangeDatesButton.addEventListener("click", editPermanentChangeDates);
 addEditShiftButton.addEventListener("click", () => {
@@ -587,7 +720,8 @@ casualStartTime.addEventListener("input", updateCasualPaidHours);
 casualFinishTime.addEventListener("input", updateCasualPaidHours);
 casualBreak.addEventListener("change", updateCasualPaidHours);
 document.querySelector("#save-casual-shift")
-    .addEventListener("click", saveCasualShift);
+    .addEventListener("click", () => saveCasualShift(false));
+saveCasualShiftAddAnotherButton.addEventListener("click", () => saveCasualShift(true));
 deleteCasualEditorButton.addEventListener("click", deleteCasualShiftFromEditor);
 document.querySelector("#cancel-casual-shift")
     .addEventListener("click", () => { closeCasualShiftEditor(); renderHome(); });
@@ -1571,6 +1705,7 @@ function deleteAddedShiftById(id) {
     });
     all[profileId] = profile;
     localStorage.setItem(STORAGE_ADDED_SHIFTS, JSON.stringify(all));
+    if (setup?.employmentType === "parttime") renderPayPeriodSummary();
 }
 
 function openDeleteRecordPage(kind) {
@@ -1586,6 +1721,8 @@ function openDeleteRecordPage(kind) {
             id: entry.id,
             sortDate: entry.date,
             label: `${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}`,
+            autoAdjustedStart: Boolean(entry.autoAdjustedStart),
+            autoAdjustedFinish: Boolean(entry.autoAdjustedFinish),
             countdown: finalisationCountdown(entry.date),
             edit: () => {
                 selectedDate = parseDateKey(entry.date);
@@ -1600,6 +1737,8 @@ function openDeleteRecordPage(kind) {
             id: entry.id,
             sortDate: entry.date,
             label: `${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}${entry.payClass === "overtime" ? " · Overtime" : " · Extra hours"}`,
+            autoAdjustedStart: Boolean(entry.autoAdjustedStart),
+            autoAdjustedFinish: Boolean(entry.autoAdjustedFinish),
             countdown: finalisationCountdown(entry.date),
             edit: () => {
                 deleteRecordPage.classList.add("hidden");
@@ -1673,7 +1812,9 @@ function openDeleteRecordPage(kind) {
         button.className = "secondary-button full-width delete-record-item";
         if (index === 0 && ["added_shift", "casual_shift"].includes(kind)) button.classList.add("oldest-shift-item");
         const showCountdown = index === 0 && ["added_shift", "casual_shift"].includes(kind) && item.countdown;
-        button.innerHTML = `<span class="record-item-label">${escapeHtml(item.label)}</span>${showCountdown ? `<span class="shift-lock-countdown">${escapeHtml(item.countdown)}</span>` : ""}`;
+        const leftAmber = item.autoAdjustedStart ? `<span class="amber-dot edit-list-amber" title="Start time was automatically adjusted"></span>` : "";
+        const rightAmber = item.autoAdjustedFinish ? `<span class="amber-dot edit-list-amber" title="Finish time was automatically adjusted"></span>` : "";
+        button.innerHTML = `<span class="record-item-label">${leftAmber}${escapeHtml(item.label)}${rightAmber}</span>${showCountdown ? `<span class="shift-lock-countdown">${escapeHtml(item.countdown)}</span>` : ""}`;
         button.addEventListener("click", () => {
             if (item.edit) {
                 item.edit();
@@ -2129,6 +2270,7 @@ function openAddedShiftEditor(entry) {
     permanentFinishTime.value = entry.finish || "";
     permanentBreak.checked = Number(entry.unpaidBreakMinutes || 0) >= 30;
     permanentChangeNotes.value = entry.notes || "";
+    renderAutoAdjustMarkers(permanentAutoAdjustMarkers, entry);
     renderPermanentChangeDateSummary();
 }
 
@@ -2144,6 +2286,7 @@ function openPermanentChangeEditor(action = "add_shift", dates = [selectedDate])
     permanentBreak.checked = false;
     permanentChangeNotes.value = "";
     permanentShiftCode.value = "";
+    renderAutoAdjustMarkers(permanentAutoAdjustMarkers, null);
     renderPermanentChangeDateSummary();
     updatePermanentChangeFields();
     permanentChangePage.classList.remove("hidden");
@@ -2155,6 +2298,10 @@ function updatePermanentChangeFields() {
     swapTypeField.classList.toggle("hidden", type !== "swap");
     permanentShiftFields.classList.toggle("hidden", type === "leave" || type === "roster_change");
     swapDateField.classList.toggle("hidden", !["swap", "roster_change"].includes(type));
+    const canAddAnother = type === "add_shift" &&
+        setup?.employmentType === "parttime" &&
+        !editingAddedShiftId;
+    savePermanentChangeAddAnotherButton.classList.toggle("hidden", !canAddAnother);
 }
 
 function selectedPermanentShift() {
@@ -2263,6 +2410,132 @@ function isRosterWorkingDay(date) {
     return !["O", "A", "", "-"].includes(code);
 }
 
+
+function shiftClockMinutes(value) {
+    const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return hour * 60 + minute;
+}
+
+function shiftInterval(start, finish) {
+    const startMinutes = shiftClockMinutes(start);
+    let finishMinutes = shiftClockMinutes(finish);
+    if (startMinutes === null || finishMinutes === null) return null;
+    if (finishMinutes <= startMinutes) finishMinutes += 24 * 60;
+    return { start: startMinutes, finish: finishMinutes };
+}
+
+function rosterShiftIntervalForDate(date) {
+    if (!setup || setup.type === "casual") return null;
+    const shift = getShiftForDate(date).shift;
+    const code = String(shift?.code || "").toUpperCase();
+    if (["O", "A", "", "-"].includes(code)) return null;
+    const parts = String(shift?.time || "").split("-");
+    if (parts.length !== 2) return null;
+    const interval = shiftInterval(parts[0], parts[1]);
+    return interval ? { ...interval, label: `${shift.code} ${parts[0]}–${parts[1]}`, kind: "roster" } : null;
+}
+
+function occupiedShiftIntervals(date, excludeId = null, casualMode = false) {
+    const intervals = [];
+    if (!casualMode) {
+        const rosterInterval = rosterShiftIntervalForDate(date);
+        if (rosterInterval) intervals.push(rosterInterval);
+        getAddedShifts(date).filter((entry) => entry?.id !== excludeId).forEach((entry) => {
+            const interval = shiftInterval(entry.start, entry.finish);
+            if (interval) intervals.push({ ...interval, label: `${entry.code} ${entry.start}–${entry.finish}`, kind: "added" });
+        });
+    } else {
+        getCasualShifts(date).filter((entry) => entry?.id !== excludeId).forEach((entry) => {
+            const interval = shiftInterval(entry.start, entry.finish);
+            if (interval) intervals.push({ ...interval, label: `${entry.code} ${entry.start}–${entry.finish}`, kind: "casual" });
+        });
+    }
+    return intervals.sort((a, b) => a.start - b.start);
+}
+
+function autoFixAddedShiftOverlap(date, startValue, finishValue, excludeId = null, casualMode = false) {
+    const original = shiftInterval(startValue, finishValue);
+    if (!original) return { ok: false, message: "Enter a valid start and finish time." };
+
+    let start = original.start;
+    let finish = original.finish;
+    let startAdjusted = false;
+    let finishAdjusted = false;
+    const originalStart = startValue;
+    const originalFinish = finishValue;
+    const occupied = occupiedShiftIntervals(date, excludeId, casualMode);
+
+    // Trim only the overlapping edge. This intentionally changes the duration:
+    // it never moves the whole added shift and silently invents extra work.
+    for (const existing of occupied) {
+        if (start < existing.finish && finish > existing.start) {
+            if (start >= existing.start && start < existing.finish && finish > existing.finish) {
+                start = existing.finish;
+                startAdjusted = true;
+            } else if (finish > existing.start && finish <= existing.finish && start < existing.start) {
+                finish = existing.start;
+                finishAdjusted = true;
+            } else {
+                return {
+                    ok: false,
+                    message: `This shift overlaps ${existing.label} and cannot be safely auto-adjusted. Edit the start or finish time.`
+                };
+            }
+        }
+    }
+
+    if (finish <= start) {
+        return { ok: false, message: "The overlap would leave no workable time. Edit the shift times." };
+    }
+
+    // Recheck after trimming, including any second/third shift.
+    for (const existing of occupied) {
+        if (start < existing.finish && finish > existing.start) {
+            return {
+                ok: false,
+                message: `This shift still overlaps ${existing.label}. Edit the start or finish time.`
+            };
+        }
+    }
+
+    const toClock = (minutes) => {
+        const normal = ((minutes % (24 * 60)) + 24 * 60) % (24 * 60);
+        return `${String(Math.floor(normal / 60)).padStart(2, "0")}:${String(normal % 60).padStart(2, "0")}`;
+    };
+
+    return {
+        ok: true,
+        start: toClock(start),
+        finish: toClock(finish),
+        autoAdjustedStart: startAdjusted,
+        autoAdjustedFinish: finishAdjusted,
+        autoOriginalStart: startAdjusted ? originalStart : null,
+        autoOriginalFinish: finishAdjusted ? originalFinish : null
+    };
+}
+
+function renderAutoAdjustMarkers(container, entry) {
+    if (!container) return;
+    const left = Boolean(entry?.autoAdjustedStart);
+    const right = Boolean(entry?.autoAdjustedFinish);
+    container.classList.toggle("hidden", !left && !right);
+    if (!left && !right) {
+        container.innerHTML = "";
+        return;
+    }
+    const leftText = left
+        ? `<span class="auto-adjust-marker auto-adjust-left" title="Start automatically adjusted from ${escapeHtml(entry.autoOriginalStart || "")} to ${escapeHtml(entry.start || "")}"><span class="amber-dot"></span> Start auto-adjusted</span>`
+        : `<span></span>`;
+    const rightText = right
+        ? `<span class="auto-adjust-marker auto-adjust-right" title="Finish automatically adjusted from ${escapeHtml(entry.autoOriginalFinish || "")} to ${escapeHtml(entry.finish || "")}">Finish auto-adjusted <span class="amber-dot"></span></span>`
+        : `<span></span>`;
+    container.innerHTML = leftText + rightText;
+}
+
 function originalShiftMinutes(date) {
     if (!isRosterWorkingDay(date)) return 0;
     const shift = getShiftForDate(date).shift;
@@ -2273,7 +2546,7 @@ function originalShiftMinutes(date) {
     return Math.max(0, gross - unpaidBreak);
 }
 
-function savePermanentChange() {
+function savePermanentChange(addAnother = false) {
     const type = permanentChangeType.value;
     const chosen = selectedPermanentShift();
     const all = loadPermanentChanges();
@@ -2324,13 +2597,30 @@ function savePermanentChange() {
             alert("A maximum of three worked shifts can be recorded for one day.");
             return;
         }
-        const grossMinutes = calculatePaidMinutes(permanentStartTime.value, permanentFinishTime.value, 0) || 0;
+        const overlapFix = autoFixAddedShiftOverlap(
+            date,
+            permanentStartTime.value,
+            permanentFinishTime.value,
+            editingAddedShiftId,
+            false
+        );
+        if (!overlapFix.ok) {
+            alert(overlapFix.message);
+            return;
+        }
+        permanentStartTime.value = overlapFix.start;
+        permanentFinishTime.value = overlapFix.finish;
+        const grossMinutes = calculatePaidMinutes(overlapFix.start, overlapFix.finish, 0) || 0;
         const unpaidBreakMinutes = grossMinutes > 5 * 60 ? 30 : (permanentBreak.checked ? 30 : 0);
         const entry = {
             id: existingAdded?.id || id, date: dateKey(date), type: "added_shift", code: chosen.code,
-            start: permanentStartTime.value, finish: permanentFinishTime.value,
+            start: overlapFix.start, finish: overlapFix.finish,
+            autoAdjustedStart: overlapFix.autoAdjustedStart,
+            autoAdjustedFinish: overlapFix.autoAdjustedFinish,
+            autoOriginalStart: overlapFix.autoOriginalStart,
+            autoOriginalFinish: overlapFix.autoOriginalFinish,
             unpaidBreakMinutes,
-            paidMinutes: calculatePaidMinutes(permanentStartTime.value, permanentFinishTime.value, unpaidBreakMinutes),
+            paidMinutes: calculatePaidMinutes(overlapFix.start, overlapFix.finish, unpaidBreakMinutes),
             payClass: existingAdded?.payClass || (setup.employmentType === "fulltime" ? "overtime" : "extra_hours"),
             notes: permanentChangeNotes.value.trim(),
             createdAt: existingAdded?.createdAt || new Date().toISOString(),
@@ -2510,6 +2800,11 @@ function savePermanentChange() {
 
     all[profileId] = records;
     localStorage.setItem(STORAGE_PERMANENT_CHANGES, JSON.stringify(all));
+    const continueAddingShift = addAnother &&
+        type === "add_shift" &&
+        setup?.employmentType === "parttime" &&
+        !editingAddedShiftId;
+
     permanentChangePage.classList.add("hidden");
     editingAddedShiftId = null;
     pendingChangeAction = null;
@@ -2519,6 +2814,10 @@ function savePermanentChange() {
     editingPermanentDates = false;
     permanentEditorSnapshot = null;
     renderHome();
+
+    if (continueAddingShift) {
+        openRosterCalendar("add_shift");
+    }
 }
 
 function deleteSelectedRecord() {
@@ -2565,8 +2864,10 @@ function openCasualShiftEditor(entryToEdit = null) {
     const currentGross = calculatePaidMinutes(entry?.start || "", entry?.finish || "", 0) || 0;
     casualBreak.checked = entry ? (entry?.unpaidBreakMinutes === 30 || String(entry?.break || "").includes("30")) : currentGross > 5 * 60;
     deleteCasualEditorButton.classList.toggle("hidden", !entry);
+    saveCasualShiftAddAnotherButton.classList.toggle("hidden", !!entry);
     casualArea.value = entry?.area || "";
     casualNotes.value = entry?.notes || "";
+    renderAutoAdjustMarkers(casualAutoAdjustMarkers, entry);
     updateCasualPaidHours();
     casualShiftPage.classList.remove("hidden");
 }
@@ -2584,10 +2885,11 @@ function clearCasualShiftForm() {
     casualBreak.checked = false;
     casualArea.value = "";
     casualNotes.value = "";
+    renderAutoAdjustMarkers(casualAutoAdjustMarkers, null);
     updateCasualPaidHours();
 }
 
-function saveCasualShift() {
+function saveCasualShift(addAnother = false) {
     const editingEntryForLock = editingCasualShiftId ? getCasualShifts(selectedDate).find((item) => item.id === editingCasualShiftId) : null;
     const unlockedForAlpha = editingEntryForLock && loadUnlockedFinalShifts().has(finalShiftUnlockKey("casual", editingEntryForLock));
     if (isShiftFinalised(dateKey(selectedDate)) && !unlockedForAlpha) {
@@ -2604,22 +2906,39 @@ function saveCasualShift() {
     }
 
     const existing = editingCasualShiftId ? getCasualShifts(selectedDate).find((item) => item.id === editingCasualShiftId) : null;
+    const overlapFix = autoFixAddedShiftOverlap(
+        selectedDate,
+        casualStartTime.value,
+        casualFinishTime.value,
+        editingCasualShiftId,
+        true
+    );
+    if (!overlapFix.ok) {
+        alert(overlapFix.message);
+        return;
+    }
+    casualStartTime.value = overlapFix.start;
+    casualFinishTime.value = overlapFix.finish;
     const entry = {
         id: existing?.id || `casual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         date: dateKey(selectedDate),
         code: standard.code,
         standardStart: standard.start,
         standardFinish: standard.finish,
-        start: casualStartTime.value,
-        finish: casualFinishTime.value,
+        start: overlapFix.start,
+        finish: overlapFix.finish,
+        autoAdjustedStart: overlapFix.autoAdjustedStart,
+        autoAdjustedFinish: overlapFix.autoAdjustedFinish,
+        autoOriginalStart: overlapFix.autoOriginalStart,
+        autoOriginalFinish: overlapFix.autoOriginalFinish,
         timesEdited:
-            casualStartTime.value !== standard.start ||
-            casualFinishTime.value !== standard.finish,
-        unpaidBreakMinutes: (calculatePaidMinutes(casualStartTime.value, casualFinishTime.value, 0) || 0) > 5 * 60 ? 30 : (casualBreak.checked ? 30 : 0),
+            overlapFix.start !== standard.start ||
+            overlapFix.finish !== standard.finish,
+        unpaidBreakMinutes: (calculatePaidMinutes(overlapFix.start, overlapFix.finish, 0) || 0) > 5 * 60 ? 30 : (casualBreak.checked ? 30 : 0),
         paidMinutes: calculatePaidMinutes(
-            casualStartTime.value,
-            casualFinishTime.value,
-            (calculatePaidMinutes(casualStartTime.value, casualFinishTime.value, 0) || 0) > 5 * 60 ? 30 : (casualBreak.checked ? 30 : 0)
+            overlapFix.start,
+            overlapFix.finish,
+            (calculatePaidMinutes(overlapFix.start, overlapFix.finish, 0) || 0) > 5 * 60 ? 30 : (casualBreak.checked ? 30 : 0)
         ),
         area: casualArea.value.trim(),
         notes: casualNotes.value.trim(),
@@ -2641,8 +2960,12 @@ function saveCasualShift() {
     allShifts[profileId] = profileShifts;
     localStorage.setItem(STORAGE_CASUAL_SHIFTS, JSON.stringify(allShifts));
 
+    const continueAddingShift = addAnother && !editingCasualShiftId;
     closeCasualShiftEditor();
     renderHome();
+    if (continueAddingShift) {
+        openRosterCalendar("add_shift");
+    }
 }
 
 function deleteCasualShiftFromEditor() {
@@ -2860,6 +3183,22 @@ function rosterHeaderWeeklyMinutes(setupToUse = setup) {
     return Number(match[1]) * 60 + Number(match[2] || 0);
 }
 
+function calculateRosterMinutesForPeriod(period, setupToUse = setup) {
+    if (!setupToUse || setupToUse.type === "casual") return 0;
+    let total = 0;
+    for (let date = startOfDay(period.start); date <= period.end; date = addDays(date, 1)) {
+        const shift = getShiftForDate(date, setupToUse).shift;
+        const code = String(shift?.code || "").toUpperCase();
+        if (["", "-", "O", "A"].includes(code)) continue;
+        const parts = String(shift?.time || "").split("-");
+        if (parts.length !== 2) continue;
+        const gross = calculatePaidMinutes(parts[0], parts[1], 0) || 0;
+        const unpaidBreak = gross > 5 * 60 ? 30 : 0;
+        total += Math.max(0, gross - unpaidBreak);
+    }
+    return total;
+}
+
 function renderPayPeriodSummary() {
     const period = getPayPeriodForDate(selectedDate);
     const profileId = profiles[activeProfileIndex]?.id;
@@ -2906,23 +3245,27 @@ function renderPayPeriodSummary() {
     if (casual) {
         const ordinary = Math.min(extraMinutes, 76 * 60);
         const overtime = Math.max(0, extraMinutes - 76 * 60);
+        const workableMinutesLeft = Math.max(0, 76 * 60 - ordinary);
         const lines = [];
-        if (ordinary > 0) lines.push(`<span><b>Casual hours:</b> ${formatPaidMinutes(ordinary)}</span>`);
+        lines.push(`<span><b>Casual hours:</b> ${formatPaidMinutes(ordinary)}</span>`);
+        lines.push(`<span class="${workableMinutesLeft <= 8 * 60 ? "workable-hours-warning" : "workable-hours-safe"}" title="${workableMinutesLeft <= 8 * 60 ? "Approaching the 76-hour ordinary-hours limit" : "Ordinary hours still available before overtime"}"><b>Workable hours left:</b> ${formatPaidMinutes(workableMinutesLeft)}</span>`);
         if (overtime > 0) lines.push(`<span><b>Overtime:</b> ${formatPaidMinutes(overtime)}</span>`);
         payPeriodHours.innerHTML = lines.join("");
     } else {
-        const standard = calculateRosterCycleFortnightMinutes(setup) || ((setup.contractedWeeklyHours || 38) * 2 * 60);
         const fulltime = setup.employmentType !== "parttime";
+        const headerWeekly = rosterHeaderWeeklyMinutes(setup);
+        const standard = !fulltime && headerWeekly !== null
+            ? headerWeekly * 2
+            : (calculateRosterMinutesForPeriod(period, setup) || calculateRosterCycleFortnightMinutes(setup) || ((setup.contractedWeeklyHours || 38) * 2 * 60));
         const additionalOrdinary = fulltime ? 0 : Math.min(extraMinutes, Math.max(0, 76 * 60 - standard));
         const overtime = fulltime ? extraMinutes : Math.max(0, extraMinutes - additionalOrdinary);
+        const workableMinutesLeft = fulltime ? 0 : Math.max(0, 76 * 60 - standard - additionalOrdinary);
         const lines = [];
-        const headerWeekly = rosterHeaderWeeklyMinutes(setup);
-        const calculatedWeekly = standard / 2;
-        if (headerWeekly !== null && Math.abs(headerWeekly - calculatedWeekly) > 1) {
-            lines.push(`<span class="pay-hours-warning"><b>Roster hours check:</b> header ${formatPaidMinutes(headerWeekly)} / calculated ${formatPaidMinutes(calculatedWeekly)}</span>`);
-        }
 
-        if (additionalOrdinary > 0) lines.push(`<span><b>Extra hours:</b> ${formatPaidMinutes(additionalOrdinary)}</span>`);
+        if (!fulltime) {
+            lines.push(`<span><b>Extra hours:</b> ${formatPaidMinutes(additionalOrdinary)}</span>`);
+            lines.push(`<span class="${workableMinutesLeft <= 8 * 60 ? "workable-hours-warning" : "workable-hours-safe"}" title="${workableMinutesLeft <= 8 * 60 ? "Approaching the 76-hour ordinary-hours limit" : "Ordinary hours still available before overtime"}"><b>Workable hours left:</b> ${formatPaidMinutes(workableMinutesLeft)}</span>`);
+        }
         if (overtime > 0) lines.push(`<span><b>Overtime:</b> ${formatPaidMinutes(overtime)}</span>`);
 
         const leaveLines = [];
