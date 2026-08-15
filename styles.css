@@ -1071,6 +1071,35 @@ button.action-locked { opacity:.45; cursor:not-allowed; }
     line-height: 1.45;
 }
 
+.install-help {
+    margin: 10px 0 24px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
+    overflow: hidden;
+}
+
+.install-help summary {
+    padding: 14px 16px;
+    color: var(--amber-light);
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.install-help-content {
+    padding: 0 16px 14px;
+}
+
+.install-help-content p {
+    margin: 10px 0;
+    line-height: 1.45;
+}
+
+.install-help-content .instructions {
+    margin-bottom: 0;
+    font-size: 0.88rem;
+}
+
 /* Beta 24: multi-shift display + explicit same-day swap mode */
 .top-shift-line, .top-time-line { display:block; }
 .shift-code .top-shift-line:not(:first-child) { font-size:.34em; line-height:1.15; margin-top:4px; }
