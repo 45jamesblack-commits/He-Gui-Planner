@@ -1010,6 +1010,45 @@ button.action-locked { opacity:.45; cursor:not-allowed; }
     font-size: 0.78rem;
 }
 
+
+/* Beta 29: one-per-device app heart, using the spare header space. */
+.app-heart-button {
+    margin-left: auto;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+
+.app-heart-button:hover {
+    border-color: var(--amber);
+}
+
+.app-heart-button:active {
+    transform: scale(0.98);
+}
+
+.app-heart-button.hearted,
+.app-heart-button:disabled {
+    border-color: rgba(255, 176, 32, 0.55);
+    background: rgba(255, 176, 32, 0.10);
+    color: var(--amber-light);
+    cursor: default;
+    opacity: 1;
+}
+
+@media (max-width: 360px) {
+    .app-heart-button {
+        padding: 6px 7px;
+        font-size: 0.66rem;
+    }
+}
+
 .settings-toggle {
     display: flex;
     align-items: center;

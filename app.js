@@ -17,6 +17,7 @@ const STORAGE_PERSONAL_CALENDAR_CACHE = "heguiPersonalCalendarCacheV27";
 const STORAGE_DISPLAY_THEME = "heguiDisplayTheme";
 const STORAGE_UNLOCKED_FINAL_SHIFTS = "heguiUnlockedFinalShiftsAlphaV27";
 const STORAGE_WEEK_PANEL_HIDDEN = "heguiWeekPanelHidden";
+const STORAGE_APP_HEARTED = "heguiAppHeartedV29";
 // Set this to the deployed Cloudflare Worker URL for private ICS feeds.
 // Keep the user's secret ICS address out of the URL/query string: the app sends it in a POST body.
 const PERSONAL_CALENDAR_PROXY_URL = "https://hegui-calendar.45james-black.workers.dev";
@@ -56,6 +57,7 @@ const plannerType = document.querySelector("#planner-type");
 const permanentSetupFields = document.querySelector("#permanent-setup-fields");
 const profileTabs = document.querySelector("#profile-tabs");
 const profileNameButton = document.querySelector("#profile-name-button");
+const appHeartButton = document.querySelector("#app-heart-button");
 const settingsButton = document.querySelector("#settings-button");
 const extrasButton = document.querySelector("#extras-button");
 const settingsPage = document.querySelector("#settings-page");
@@ -165,6 +167,44 @@ const availabilityClearDayButton = document.querySelector("#availability-clear-d
 
 const resetRosterButton =
     document.querySelector("#reset-roster");
+
+
+function updateAppHeartButton() {
+    if (!appHeartButton) return;
+    const hearted = localStorage.getItem(STORAGE_APP_HEARTED) === "true";
+    appHeartButton.disabled = hearted;
+    appHeartButton.classList.toggle("hearted", hearted);
+    appHeartButton.innerHTML = hearted
+        ? '<span aria-hidden="true">❤️</span> Thanks!'
+        : '<span aria-hidden="true">❤️</span> I Heart this app';
+    appHeartButton.setAttribute(
+        "aria-label",
+        hearted ? "Thanks for hearting Hé Guǐ" : "I Heart this app"
+    );
+}
+
+function heartHeguiApp() {
+    if (!appHeartButton) return;
+    if (localStorage.getItem(STORAGE_APP_HEARTED) === "true") {
+        updateAppHeartButton();
+        return;
+    }
+
+    // Save first so repeat taps/reloads from this browser/device cannot create extra votes.
+    localStorage.setItem(STORAGE_APP_HEARTED, "true");
+    updateAppHeartButton();
+
+    logHeguiEvent("app_like", {
+        action: "heart_app",
+        details: {
+            source: "home_header",
+            once_per_device: true
+        }
+    });
+}
+
+updateAppHeartButton();
+appHeartButton?.addEventListener("click", heartHeguiApp);
 
 
 function availabilityTestRosterInterval(date) {
