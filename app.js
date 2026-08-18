@@ -8,6 +8,8 @@ const STORAGE_ACT_PUBLIC_HOLIDAYS =
     "heguiShowActPublicHolidays";
 const STORAGE_ACT_SCHOOL_HOLIDAYS =
     "heguiShowActSchoolHolidays";
+const STORAGE_NSW_PUBLIC_HOLIDAYS = "heguiShowNswPublicHolidays";
+const STORAGE_NSW_SCHOOL_HOLIDAYS = "heguiShowNswSchoolHolidays";
 const STORAGE_CASUAL_SHIFTS = "heguiCasualShifts";
 const STORAGE_PERMANENT_CHANGES = "heguiPermanentChanges";
 const STORAGE_ADDED_SHIFTS = "heguiAddedShiftsV20";
@@ -38,6 +40,8 @@ let setup = null;
 let selectedDate = startOfDay(new Date());
 let showActPublicHolidays = true;
 let showActSchoolHolidays = false;
+let showNswPublicHolidays = false;
+let showNswSchoolHolidays = false;
 let personalCalendarEvents = [];
 let editingAddedShiftId = null;
 const startupSplashStartedAt = Date.now();
@@ -70,6 +74,8 @@ const actPublicHolidaysCheckbox =
     document.querySelector("#act-public-holidays-checkbox");
 const actSchoolHolidaysCheckbox =
     document.querySelector("#act-school-holidays-checkbox");
+const nswPublicHolidaysCheckbox = document.querySelector("#nsw-public-holidays-checkbox");
+const nswSchoolHolidaysCheckbox = document.querySelector("#nsw-school-holidays-checkbox");
 const todayLabel = document.querySelector("#today-label");
 const todayDate = document.querySelector("#today-date");
 const publicHoliday = document.querySelector("#public-holiday");
@@ -160,6 +166,7 @@ const availabilityTestPage = document.querySelector("#availability-test-page");
 const availabilityTestGrid = document.querySelector("#availability-test-grid");
 const openAvailabilityTestButton = document.querySelector("#open-availability-test");
 const closeAvailabilityTestButton = document.querySelector("#close-availability-test");
+const printAvailabilityButton = document.querySelector("#print-availability");
 const availabilityMarkAvailableButton = document.querySelector("#availability-mark-available");
 const availabilityMarkUnavailableButton = document.querySelector("#availability-mark-unavailable");
 const availabilityClearDayButton = document.querySelector("#availability-clear-day");
@@ -175,11 +182,11 @@ function updateAppHeartButton() {
     appHeartButton.disabled = hearted;
     appHeartButton.classList.toggle("hearted", hearted);
     appHeartButton.innerHTML = hearted
-        ? '<span aria-hidden="true">❤️</span> Thanks!'
-        : '<span aria-hidden="true">❤️</span> I Heart this app';
+        ? '<span aria-hidden="true">&#9829;</span> Thanks!'
+        : '<span aria-hidden="true">&#9829;</span> I Heart this app';
     appHeartButton.setAttribute(
         "aria-label",
-        hearted ? "Thanks for hearting Hé Guǐ" : "I Heart this app"
+        hearted ? "Thanks for hearting He Gui" : "I Heart this app"
     );
 }
 
@@ -225,8 +232,6 @@ const availabilityTestSelections = {};
 
 function setAvailabilityTestMode(mode) {
     availabilityTestMode = mode;
-    availabilityMarkAvailableButton?.classList.toggle("active", mode === "available");
-    availabilityMarkUnavailableButton?.classList.toggle("active", mode === "unavailable");
 }
 
 function availabilityTestKey(date, slot) {
@@ -237,10 +242,8 @@ function renderAvailabilityTest() {
     if (!availabilityTestGrid) return;
     const period = getPayPeriodForDate(selectedDate || new Date());
     const dates = Array.from({ length: 14 }, (_, i) => addDays(period.start, i));
-    const startMinute = 5 * 60;
-    const finishMinute = 21 * 60;
     const slots = [];
-    for (let m = startMinute; m < finishMinute; m += 30) slots.push(m);
+    for (let m = 5 * 60; m < 21 * 60; m += 30) slots.push(m);
 
     const timeLabel = (m) => {
         const h = Math.floor(m / 60);
@@ -248,16 +251,26 @@ function renderAvailabilityTest() {
         return `${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`;
     };
 
-    let html = `<div class="availability-corner">Time</div>`;
+    let html = `<div class="availability-legend-head">Legend</div><div class="availability-corner">Time</div>`;
     dates.forEach((date, dayIndex) => {
-        html += `<div class="availability-day-head" data-day-index="${dayIndex}">
+        const editableSlots = slots.filter((slot) => {
+            const roster = availabilityTestRosterInterval(date);
+            return !(roster && slot < roster.finish && (slot + 30) > roster.start);
+        });
+        const states = editableSlots.map((slot) => availabilityTestSelections[availabilityTestKey(date, slot)] || "neutral");
+        const dayState = states.length && states.every((state) => state === "available") ? "available" :
+            states.length && states.every((state) => state === "unavailable") ? "unavailable" : "neutral";
+        const dayAction = dayState === "available" ? "Set whole day unavailable" : dayState === "unavailable" ? "Clear whole day" : "Set whole day available";
+        html += `<button type="button" class="availability-day-head availability-all-day ${dayState}" data-day-index="${dayIndex}" data-date="${dateKey(date)}" title="${dayAction}" aria-label="${dayAction}">
             <strong>${date.toLocaleDateString("en-AU",{weekday:"short"})}</strong>
             <span>${date.toLocaleDateString("en-AU",{day:"2-digit",month:"2-digit"})}</span>
-            <button type="button" class="availability-all-day" data-date="${dateKey(date)}">Available all day</button>
-        </div>`;
+        </button>`;
     });
 
     slots.forEach((slot) => {
+        const legendClass = slot >= 360 && slot < 420 ? " available" : slot >= 420 && slot < 480 ? " rostered" : slot >= 480 && slot < 540 ? " unavailable" : "";
+        const legendText = slot === 360 ? "Available" : slot === 420 ? "Rostered / Working" : slot === 480 ? "Unavailable" : "";
+        html += `<div class="availability-side-cell${legendClass}">${legendText}</div>`;
         html += `<div class="availability-time">${timeLabel(slot)}</div>`;
         dates.forEach((date) => {
             const roster = availabilityTestRosterInterval(date);
@@ -265,8 +278,8 @@ function renderAvailabilityTest() {
             const key = availabilityTestKey(date, slot);
             const selectedState = availabilityTestSelections[key];
             const state = rostered ? "rostered" : (selectedState || "neutral");
-            const title = rostered ? `${roster.code} rostered — cannot change` :
-                `${timeLabel(slot)}–${timeLabel(slot + 30)} · ${state === "neutral" ? "Not marked" : state}`;
+            const title = rostered ? `${roster.code} rostered - cannot change` :
+                `${timeLabel(slot)}-${timeLabel(slot + 30)} - ${state === "neutral" ? "Not marked" : state}`;
             html += `<button type="button" class="availability-slot ${state}" data-date="${dateKey(date)}" data-slot="${slot}" ${rostered ? "disabled" : ""} title="${title}" aria-label="${title}"></button>`;
         });
     });
@@ -275,47 +288,35 @@ function renderAvailabilityTest() {
     availabilityTestGrid.querySelectorAll(".availability-slot:not(:disabled)").forEach((button) => {
         button.addEventListener("click", () => {
             const key = `${button.dataset.date}|${button.dataset.slot}`;
-            availabilityTestSelections[key] = availabilityTestMode;
-            button.classList.remove("neutral", "available", "unavailable");
-            button.classList.add(availabilityTestMode);
+            const current = availabilityTestSelections[key] || "neutral";
+            const next = current === "neutral" ? "available" : current === "available" ? "unavailable" : "neutral";
+            if (next === "neutral") delete availabilityTestSelections[key];
+            else availabilityTestSelections[key] = next;
+            renderAvailabilityTest();
         });
     });
 
     availabilityTestGrid.querySelectorAll(".availability-all-day").forEach((button) => {
         button.addEventListener("click", () => {
             const targetDate = parseDateKey(button.dataset.date);
-            slots.forEach((slot) => {
+            const editableKeys = slots.filter((slot) => {
                 const roster = availabilityTestRosterInterval(targetDate);
-                const rostered = roster && slot < roster.finish && (slot + 30) > roster.start;
-                if (!rostered) availabilityTestSelections[availabilityTestKey(targetDate, slot)] = "available";
+                return !(roster && slot < roster.finish && (slot + 30) > roster.start);
+            }).map((slot) => availabilityTestKey(targetDate, slot));
+            const allAvailable = editableKeys.length && editableKeys.every((key) => availabilityTestSelections[key] === "available");
+            const allUnavailable = editableKeys.length && editableKeys.every((key) => availabilityTestSelections[key] === "unavailable");
+            const next = allAvailable ? "unavailable" : allUnavailable ? "neutral" : "available";
+            editableKeys.forEach((key) => {
+                if (next === "neutral") delete availabilityTestSelections[key];
+                else availabilityTestSelections[key] = next;
             });
             renderAvailabilityTest();
         });
     });
 }
 
-availabilityMarkAvailableButton?.addEventListener("click", () => setAvailabilityTestMode("available"));
-availabilityMarkUnavailableButton?.addEventListener("click", () => setAvailabilityTestMode("unavailable"));
-
-availabilityClearDayButton?.addEventListener("click", () => {
-    const answer = prompt("Clear which date? Enter DD/MM (for example 14/08).");
-    if (!answer) return;
-    const period = getPayPeriodForDate(selectedDate || new Date());
-    const dates = Array.from({ length: 14 }, (_, i) => addDays(period.start, i));
-    const match = dates.find((date) => date.toLocaleDateString("en-AU",{day:"2-digit",month:"2-digit"}) === answer.trim());
-    if (!match) {
-        alert("That date is not in this fortnight.");
-        return;
-    }
-    Object.keys(availabilityTestSelections).forEach((key) => {
-        if (key.startsWith(`${dateKey(match)}|`)) delete availabilityTestSelections[key];
-    });
-    renderAvailabilityTest();
-});
-
 openAvailabilityTestButton?.addEventListener("click", () => {
     document.querySelector("#extras-page")?.classList.add("hidden");
-    setAvailabilityTestMode("available");
     renderAvailabilityTest();
     availabilityTestPage?.classList.remove("hidden");
 });
@@ -323,6 +324,50 @@ openAvailabilityTestButton?.addEventListener("click", () => {
 closeAvailabilityTestButton?.addEventListener("click", () => {
     availabilityTestPage?.classList.add("hidden");
     document.querySelector("#extras-page")?.classList.remove("hidden");
+});
+
+function buildAvailabilityPrintDocument() {
+    const period = getPayPeriodForDate(selectedDate || new Date());
+    const dates = Array.from({ length: 14 }, (_, i) => addDays(period.start, i));
+    const slots = [];
+    for (let m = 5 * 60; m < 21 * 60; m += 30) slots.push(m);
+    const activeProfile = profiles?.[activeProfileIndex];
+    const profileName = activeProfile?.name || "Roster profile";
+    const timeLabel = (m) => `${String(Math.floor(m / 60)).padStart(2,"0")}:${String(m % 60).padStart(2,"0")}`;
+    const legendFor = (slot) => slot === 360 ? "Available" : slot === 420 ? "Rostered / Working" : slot === 480 ? "Unavailable" : "";
+    const legendClass = (slot) => slot >= 360 && slot < 420 ? " available" : slot >= 420 && slot < 480 ? " rostered" : slot >= 480 && slot < 540 ? " unavailable" : "";
+    const headers = dates.map((date) => `<th>${date.toLocaleDateString("en-AU",{weekday:"short"})}<br>${date.toLocaleDateString("en-AU",{day:"2-digit",month:"2-digit"})}</th>`).join("");
+    const rows = slots.map((slot) => {
+        const cells = dates.map((date) => {
+            const roster = availabilityTestRosterInterval(date);
+            const rostered = roster && slot < roster.finish && (slot + 30) > roster.start;
+            const state = rostered ? "rostered" : (availabilityTestSelections[availabilityTestKey(date, slot)] || "neutral");
+            return `<td class="${state}"></td>`;
+        }).join("");
+        const legend = legendFor(slot) ? `<span class="sidelegend${legendClass(slot)}">${legendFor(slot)}</span>` : "";
+        return `<tr><th class="legendcol">${legend}</th><th class="time">${timeLabel(slot)}</th>${cells}</tr>`;
+    }).join("");
+
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Availability - ${escapeHtml(profileName)}</title>
+<style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0}h1{margin:0;font-size:20px}.sub{font-size:11px;margin:3px 0 8px}.notice{border:2px solid #111;padding:6px 8px;margin:7px 0 10px;font-size:11px;font-weight:700}.actions{margin:0 0 10px}button{padding:8px 14px;font-weight:700}table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:8px}th,td{border:1px solid #777;height:13px;text-align:center}thead th{height:29px;font-size:8px}.legendcol{width:92px;text-align:left;padding-left:3px}.time{width:45px;text-align:right;padding-right:4px;font-weight:700;background:#fff}.sidelegend{display:block;padding:2px 4px;border-radius:3px;font-size:7px}.available{background:#72bf78!important}.rostered{background:#9aa1a8!important;background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 2px,transparent 2px 6px)!important}.unavailable{background:#d7a13b!important}.neutral{background:#fff!important}.footer{font-size:9px;margin-top:7px}.signature{display:flex;gap:28px;margin-top:10px;font-size:10px}.signature span{flex:1;border-top:1px solid #555;padding-top:3px}@media print{.actions{display:none}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>
+<div class="actions"><button onclick="window.print()">Print / Save PDF</button> <button onclick="window.close()">Close</button></div>
+<h1>Availability</h1><div class="sub"><strong>${escapeHtml(profileName)}</strong> &middot; ${formatAustralianDate(period.start)} - ${formatAustralianDate(period.end)}</div>
+<div class="notice">PERSONAL AVAILABILITY ONLY - not an official roster, approval, leave request or management instruction. Supervisor must refer to the employer's official roster and processes.</div>
+<table><thead><tr><th class="legendcol">Legend</th><th class="time">Time</th>${headers}</tr></thead><tbody>${rows}</tbody></table>
+<div class="footer">Green = Available &nbsp; | &nbsp; Grey = Rostered / Working &nbsp; | &nbsp; Gold = Unavailable. Blank = not marked.</div>
+<div class="signature"><span>Employee / profile</span><span>Supervisor notes</span><span>Date received</span></div>
+</body></html>`;
+}
+
+printAvailabilityButton?.addEventListener("click", () => {
+    const printWindow = window.open("", "hegui-availability-print");
+    if (!printWindow) {
+        alert("Please allow pop-ups to open the Availability print preview.");
+        return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(buildAvailabilityPrintDocument());
+    printWindow.document.close();
 });
 
 function applyDisplayTheme(theme) {
@@ -562,13 +607,13 @@ async function refreshPersonalCalendar(showStatus = false) {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
     if (!saved.enabled || !saved.url) return;
-    if (showStatus && personalCalendarStatus) personalCalendarStatus.textContent = "Loading personal calendar…";
+    if (showStatus && personalCalendarStatus) personalCalendarStatus.textContent = "Loading personal calendar...";
     try {
         const text = await fetchPersonalCalendarIcs(saved.url);
         const events = parseIcsEvents(text);
         personalCalendarEvents = events;
         localStorage.setItem(STORAGE_PERSONAL_CALENDAR_CACHE, JSON.stringify({ updatedAt: new Date().toISOString(), events }));
-        if (personalCalendarStatus) personalCalendarStatus.textContent = `Calendar active — ${events.length} events loaded.`;
+        if (personalCalendarStatus) personalCalendarStatus.textContent = `Calendar active - ${events.length} events loaded.`;
         if (setup && rosters.length > 0) renderHome();
         if (!rosterCalendarPage?.classList.contains("hidden")) renderRosterCalendar();
     } catch (error) {
@@ -577,7 +622,7 @@ async function refreshPersonalCalendar(showStatus = false) {
                 ? "Could not refresh the personal calendar. Showing the last saved calendar copy."
                 : (PERSONAL_CALENDAR_PROXY_URL
                     ? "Could not load the personal calendar through the calendar service."
-                    : "This calendar provider blocks direct browser access. Hé Guǐ's calendar service still needs its one-time connection URL.");
+                    : "This calendar provider blocks direct browser access. H\u00e9 Gu\u01d0's calendar service still needs its one-time connection URL.");
         }
     }
 }
@@ -648,24 +693,46 @@ actPublicHolidaysCheckbox.addEventListener("change", () => {
 const savedActSchoolHolidayPreference =
     localStorage.getItem(STORAGE_ACT_SCHOOL_HOLIDAYS);
 
-showActSchoolHolidays =
-    savedActSchoolHolidayPreference === "true";
+showActSchoolHolidays = savedActSchoolHolidayPreference === "true";
+showNswPublicHolidays = localStorage.getItem(STORAGE_NSW_PUBLIC_HOLIDAYS) === "true";
+showNswSchoolHolidays = localStorage.getItem(STORAGE_NSW_SCHOOL_HOLIDAYS) === "true";
 
-actSchoolHolidaysCheckbox.checked =
-    showActSchoolHolidays;
+// Only one school-holiday region can be active at a time.
+if (showActSchoolHolidays && showNswSchoolHolidays) {
+    showNswSchoolHolidays = false;
+    localStorage.setItem(STORAGE_NSW_SCHOOL_HOLIDAYS, "false");
+}
 
-actSchoolHolidaysCheckbox.addEventListener("change", () => {
-    showActSchoolHolidays =
-        actSchoolHolidaysCheckbox.checked;
+if (actSchoolHolidaysCheckbox) actSchoolHolidaysCheckbox.checked = showActSchoolHolidays;
+if (nswPublicHolidaysCheckbox) nswPublicHolidaysCheckbox.checked = showNswPublicHolidays;
+if (nswSchoolHolidaysCheckbox) nswSchoolHolidaysCheckbox.checked = showNswSchoolHolidays;
 
-    localStorage.setItem(
-        STORAGE_ACT_SCHOOL_HOLIDAYS,
-        String(showActSchoolHolidays)
-    );
-
-    if (setup && rosters.length > 0) {
-        renderHome();
+actSchoolHolidaysCheckbox?.addEventListener("change", () => {
+    showActSchoolHolidays = actSchoolHolidaysCheckbox.checked;
+    if (showActSchoolHolidays) {
+        showNswSchoolHolidays = false;
+        if (nswSchoolHolidaysCheckbox) nswSchoolHolidaysCheckbox.checked = false;
+        localStorage.setItem(STORAGE_NSW_SCHOOL_HOLIDAYS, "false");
     }
+    localStorage.setItem(STORAGE_ACT_SCHOOL_HOLIDAYS, String(showActSchoolHolidays));
+    if (setup && rosters.length > 0) renderHome();
+});
+
+nswPublicHolidaysCheckbox?.addEventListener("change", () => {
+    showNswPublicHolidays = nswPublicHolidaysCheckbox.checked;
+    localStorage.setItem(STORAGE_NSW_PUBLIC_HOLIDAYS, String(showNswPublicHolidays));
+    if (setup && rosters.length > 0) renderHome();
+});
+
+nswSchoolHolidaysCheckbox?.addEventListener("change", () => {
+    showNswSchoolHolidays = nswSchoolHolidaysCheckbox.checked;
+    if (showNswSchoolHolidays) {
+        showActSchoolHolidays = false;
+        if (actSchoolHolidaysCheckbox) actSchoolHolidaysCheckbox.checked = false;
+        localStorage.setItem(STORAGE_ACT_SCHOOL_HOLIDAYS, "false");
+    }
+    localStorage.setItem(STORAGE_NSW_SCHOOL_HOLIDAYS, String(showNswSchoolHolidays));
+    if (setup && rosters.length > 0) renderHome();
 });
 
 resetRosterButton.addEventListener("click", resetSetup);
@@ -790,7 +857,7 @@ async function initialiseApp() {
     if (rosters.length > 0) {
         fillRosterList();
     } else {
-        rosterSelect.innerHTML = '<option value="">Loading rosters…</option>';
+        rosterSelect.innerHTML = '<option value="">Loading rosters...</option>';
         rosterSelect.disabled = true;
     }
 
@@ -835,7 +902,7 @@ async function initialiseApp() {
         if (rosters.length > 0) {
             fillRosterList();
         } else {
-            rosterSelect.innerHTML = '<option value="">Roster unavailable — load CSV below</option>';
+            rosterSelect.innerHTML = '<option value="">Roster unavailable - load CSV below</option>';
             rosterSelect.disabled = true;
             if (!document.querySelector("#csv-loader")) {
                 showCsvLoader();
@@ -1046,7 +1113,7 @@ function switchProfile(index) {
 function renameActiveProfile() {
     const currentProfile = profiles[activeProfileIndex];
     const enteredName = prompt(
-        "Enter this profile’s name",
+        "Enter this profile's name",
         currentProfile.name
     );
 
@@ -1282,7 +1349,7 @@ function fillRosterList() {
 
         option.value = String(index);
         option.textContent =
-            `${roster.name} — ${roster.shifts.length} positions`;
+            `${roster.name} - ${roster.shifts.length} positions`;
 
         rosterSelect.appendChild(option);
     });
@@ -1347,7 +1414,7 @@ function renderRosterDayHelper() {
 
 function applyRosterDayHelperSelection(updateInput = true) {
     if (!helperRosterRow || !helperRosterColumn) {
-        rosterHelperResult.textContent = "Select a row and today’s position.";
+        rosterHelperResult.textContent = "Select a row and today's position.";
         return;
     }
     const rosterDay = (helperRosterRow - 1) * 28 + helperRosterColumn;
@@ -1358,7 +1425,7 @@ function applyRosterDayHelperSelection(updateInput = true) {
         return;
     }
     if (updateInput) rosterDayInput.value = rosterDay;
-    rosterHelperResult.textContent = `Row ${helperRosterRow} · ${label} → roster day ${rosterDay}`;
+    rosterHelperResult.textContent = `Row ${helperRosterRow} - ${label} -> roster day ${rosterDay}`;
 }
 
 function beginSetupCheck() {
@@ -1472,18 +1539,14 @@ function renderHome() {
         year: "numeric"
     });
 
-    const holidayName = showActPublicHolidays
-        ? getActPublicHoliday(selectedDate)
-        : "";
-
-    if (holidayName) {
-        publicHoliday.textContent =
-            `ACT Public Holiday — ${holidayName}`;
-        publicHoliday.classList.remove("hidden");
-    } else {
-        publicHoliday.textContent = "";
-        publicHoliday.classList.add("hidden");
-    }
+    const actHolidayName = showActPublicHolidays ? getActPublicHoliday(selectedDate) : "";
+    const nswHolidayName = showNswPublicHolidays ? getNswPublicHoliday(selectedDate) : "";
+    const holidayLines = [];
+    if (actHolidayName) holidayLines.push(`ACT Public Holiday - ${actHolidayName}`);
+    if (nswHolidayName && nswHolidayName !== actHolidayName) holidayLines.push(`NSW Public Holiday - ${nswHolidayName}`);
+    publicHoliday.textContent = holidayLines.join(" | ");
+    publicHoliday.classList.toggle("hidden", holidayLines.length === 0);
+    publicHoliday.classList.toggle("nsw-holiday-text", !actHolidayName && Boolean(nswHolidayName));
 
     // The large card is the immutable base roster reference. Changes are shown
     // in the week/calendar and fortnight summary, never substituted into this card.
@@ -1536,14 +1599,14 @@ function setSelectedDateHeading() {
 }
 
 function renderHoliday(date) {
-    const holidayName = showActPublicHolidays
-        ? getActPublicHoliday(date)
-        : "";
-
-    publicHoliday.textContent = holidayName
-        ? `ACT Public Holiday — ${holidayName}`
-        : "";
-    publicHoliday.classList.toggle("hidden", !holidayName);
+    const actHolidayName = showActPublicHolidays ? getActPublicHoliday(date) : "";
+    const nswHolidayName = showNswPublicHolidays ? getNswPublicHoliday(date) : "";
+    const holidayLines = [];
+    if (actHolidayName) holidayLines.push(`ACT Public Holiday - ${actHolidayName}`);
+    if (nswHolidayName && nswHolidayName !== actHolidayName) holidayLines.push(`NSW Public Holiday - ${nswHolidayName}`);
+    publicHoliday.textContent = holidayLines.join(" | ");
+    publicHoliday.classList.toggle("hidden", holidayLines.length === 0);
+    publicHoliday.classList.toggle("nsw-holiday-text", !actHolidayName && Boolean(nswHolidayName));
 }
 
 function setWeekPanelHidden(hidden, persist = true) {
@@ -1599,19 +1662,31 @@ function renderWeek() {
         else if (date <= endOfCurrentWeek(today)) label = date.toLocaleDateString("en-AU", { weekday: "long" });
         else label = date.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
 
-        const holidayName = showActPublicHolidays ? getActPublicHoliday(date) : "";
-        const holidayMarkup = holidayName ? `<span class="week-day-holiday">${escapeHtml(holidayName)}</span>` : "";
-        const schoolHolidayName = showActSchoolHolidays ? getActSchoolHoliday(date) : "";
-        const schoolHolidayIconMarkup = schoolHolidayName
-            ? `<img class="school-holiday-icon" src="school-holidays-icon.png" alt="" aria-hidden="true">`
-            : "";
-        const schoolHolidayMarkup = schoolHolidayName ? `<span class="week-day-school-holiday">${escapeHtml(schoolHolidayName)}</span>` : "";
+        const actHolidayName = showActPublicHolidays ? getActPublicHoliday(date) : "";
+        const nswHolidayName = showNswPublicHolidays ? getNswPublicHoliday(date) : "";
+        const holidayMarkup = [
+            actHolidayName ? `<span class="week-day-holiday">${escapeHtml(actHolidayName)}</span>` : "",
+            nswHolidayName && nswHolidayName !== actHolidayName ? `<span class="week-day-holiday nsw-holiday-text">NSW - ${escapeHtml(nswHolidayName)}</span>` : ""
+        ].filter(Boolean).join("");
+        const actSchoolHolidayName = showActSchoolHolidays ? getActSchoolHoliday(date) : "";
+        const nswSchoolHolidayName = showNswSchoolHolidays ? getNswSchoolHoliday(date) : "";
+        // One school-holiday icon only in the 7-day view. NSW wins the icon when both apply.
+        const schoolHolidayIconMarkup = nswSchoolHolidayName
+            ? `<img class="school-holiday-icon" src="nsw-school-holidays-icon.svg" alt="" aria-hidden="true">`
+            : actSchoolHolidayName
+                ? `<img class="school-holiday-icon" src="school-holidays-icon.png" alt="" aria-hidden="true">`
+                : "";
+        const schoolHolidayMarkup = nswSchoolHolidayName
+            ? `<span class="week-day-school-holiday nsw-holiday-text">${escapeHtml(nswSchoolHolidayName)}</span>`
+            : actSchoolHolidayName
+                ? `<span class="week-day-school-holiday">${escapeHtml(actSchoolHolidayName)}</span>`
+                : "";
 
         const shiftItems = [];
         if (setup?.type === "casual") {
             getCasualShifts(date).forEach((entry) => {
                 shiftItems.push({
-                    text: `${entry.code} ${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`,
+                    text: `${entry.code} ${formatClockTime(entry.start)} - ${formatClockTime(entry.finish)}`,
                     added: true,
                     edited: Boolean(entry.timesEdited)
                 });
@@ -1630,7 +1705,7 @@ function renderWeek() {
                 });
             }
             getAddedShifts(date).forEach((entry) => {
-                shiftItems.push({ text: `${entry.code} ${formatClockTime(entry.start)}–${formatClockTime(entry.finish)}`, added: true });
+                shiftItems.push({ text: `${entry.code} ${formatClockTime(entry.start)} - ${formatClockTime(entry.finish)}`, added: true });
             });
         }
 
@@ -1653,7 +1728,7 @@ function renderWeek() {
             : "";
 
         row.innerHTML = `
-            ${hasOverflow ? '<span class="week-overflow-dot" title="More shifts — check Monthly View" aria-label="More shifts — check Monthly View"></span>' : ""}
+            ${hasOverflow ? '<span class="week-overflow-dot" title="More shifts - check Monthly View" aria-label="More shifts - check Monthly View"></span>' : ""}
             <span class="week-day-date">
                 <span class="school-holiday-icon-slot">${schoolHolidayIconMarkup}</span>
                 <span class="week-day-date-copy">
@@ -1690,7 +1765,7 @@ function fillCasualShiftList() {
     shiftCodes.forEach((shift, index) => {
         const option = document.createElement("option");
         option.value = String(index);
-        option.textContent = `${shift.code} — ${shift.start}–${shift.finish}`;
+        option.textContent = `${shift.code} - ${shift.start}-${shift.finish}`;
         casualShiftCode.appendChild(option);
         permanentShiftCode.appendChild(option.cloneNode(true));
     });
@@ -1760,7 +1835,7 @@ function openDeleteRecordPage(kind) {
         items = Object.values(profile).flatMap(normaliseCasualDay).filter((entry) => !isEntryFinalised("casual", entry)).map((entry) => ({
             id: entry.id,
             sortDate: entry.date,
-            label: `${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}`,
+            label: `${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}`,
             autoAdjustedStart: Boolean(entry.autoAdjustedStart),
             autoAdjustedFinish: Boolean(entry.autoAdjustedFinish),
             countdown: finalisationCountdown(entry.date),
@@ -1776,7 +1851,7 @@ function openDeleteRecordPage(kind) {
         items = Object.values(profile).flat().filter((entry) => !isEntryFinalised("added", entry)).map((entry) => ({
             id: entry.id,
             sortDate: entry.date,
-            label: `${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}${entry.payClass === "overtime" ? " · Overtime" : " · Extra hours"}`,
+            label: `${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}${entry.payClass === "overtime" ? " - Overtime" : " - Extra hours"}`,
             autoAdjustedStart: Boolean(entry.autoAdjustedStart),
             autoAdjustedFinish: Boolean(entry.autoAdjustedFinish),
             countdown: finalisationCountdown(entry.date),
@@ -1791,7 +1866,7 @@ function openDeleteRecordPage(kind) {
         items = Object.values(profile).flat().map((entry) => ({
             id: entry.id,
             sortDate: entry.date,
-            label: `${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}${entry.payClass === "overtime" ? " · Overtime" : " · Extra hours"}`,
+            label: `${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}${entry.payClass === "overtime" ? " - Overtime" : " - Extra hours"}`,
             remove: () => deleteAddedShiftById(entry.id)
         }));
         deleteRecordTitle.textContent = "Delete Added Shift";
@@ -1803,7 +1878,7 @@ function openDeleteRecordPage(kind) {
             .map((entry) => ({
                 id: `casual-${entry.id}`,
                 sortDate: entry.date,
-                label: `FINAL · ${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}`,
+                label: `FINAL - ${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}`,
                 unlock: () => unlockFinalisedEntry("casual", entry)
             }));
         const addedItems = Object.values(addedProfile).flat()
@@ -1811,11 +1886,11 @@ function openDeleteRecordPage(kind) {
             .map((entry) => ({
                 id: `added-${entry.id}`,
                 sortDate: entry.date,
-                label: `FINAL · ${formatAustralianDate(parseDateKey(entry.date))} — ${entry.code} ${entry.start}–${entry.finish}${entry.payClass === "overtime" ? " · Overtime" : " · Extra hours"}`,
+                label: `FINAL - ${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}${entry.payClass === "overtime" ? " - Overtime" : " - Extra hours"}`,
                 unlock: () => unlockFinalisedEntry("added", entry)
             }));
         items = [...casualItems, ...addedItems];
-        deleteRecordTitle.textContent = "Alpha — Unlock Finalised Shift";
+        deleteRecordTitle.textContent = "Alpha - Unlock Finalised Shift";
     } else {
         const records = loadPermanentChanges()[profileId] || {};
         const wanted = kind === "swap"
@@ -1826,12 +1901,16 @@ function openDeleteRecordPage(kind) {
             groups[entry.id] ||= [];
             groups[entry.id].push(entry);
         });
-        items = Object.entries(groups).map(([id, entries]) => {
+        items = Object.entries(groups)
+            .filter(([, entries]) => entries.some((entry) => !isShiftFinalised(entry.date)))
+            .map(([id, entries]) => {
             const ordered = [...entries].sort((a,b) => a.date.localeCompare(b.date));
-            const codes = ordered.map((e) => `${formatAustralianDate(parseDateKey(e.date))} ${e.originalCode && e.sameDay ? `${e.originalCode}→` : ""}${e.code || ""}`).join(" ↔ ");
+            const codes = ordered.map((e) => `${formatAustralianDate(parseDateKey(e.date))} ${e.originalCode && e.sameDay ? `${e.originalCode}->` : ""}${e.code || ""}`).join(" / ");
             return {
                 id,
-                label: `${kind === "swap" ? (entries[0]?.swapType === "colleague" ? "Colleague Swap" : "Individual Swap") : "Management Change"} — ${codes}`,
+                sortDate: ordered[0]?.date || "",
+                countdown: finalisationCountdown(ordered[0]?.date),
+                label: `${kind === "swap" ? (entries[0]?.swapType === "colleague" ? "Colleague Swap" : "Individual Swap") : "Management Change"} - ${codes}`,
                 remove: () => deletePermanentLinkedRecord(id)
             };
         });
@@ -1851,7 +1930,7 @@ function openDeleteRecordPage(kind) {
         button.type = "button";
         button.className = "secondary-button full-width delete-record-item";
         if (index === 0 && ["added_shift", "casual_shift"].includes(kind)) button.classList.add("oldest-shift-item");
-        const showCountdown = index === 0 && ["added_shift", "casual_shift"].includes(kind) && item.countdown;
+        const showCountdown = index === 0 && ["added_shift", "casual_shift", "swap", "management"].includes(kind) && item.countdown;
         const leftAmber = item.autoAdjustedStart ? `<span class="amber-dot edit-list-amber" title="Start time was automatically adjusted"></span>` : "";
         const rightAmber = item.autoAdjustedFinish ? `<span class="amber-dot edit-list-amber" title="Finish time was automatically adjusted"></span>` : "";
         button.innerHTML = `<span class="record-item-label">${leftAmber}${escapeHtml(item.label)}${rightAmber}</span>${showCountdown ? `<span class="shift-lock-countdown">${escapeHtml(item.countdown)}</span>` : ""}`;
@@ -1965,13 +2044,13 @@ function openRosterCalendar(action) {
                 long_service_leave: "Long Service Leave",
                 other_leave: "Other Leave"
             })[pendingLeaveType] || "Leave",
-            "Tap any start date and finish date. The earlier date becomes Start and the later date becomes Finish. Hé Guǐ will apply leave only to rostered working days."
+            "Tap any start date and finish date. The earlier date becomes Start and the later date becomes Finish. H\u00e9 Gu\u01d0 will apply leave only to rostered working days."
         ],
         swap: [
             pendingSwapType === "colleague" ? "Colleague Swap" : "Individual Swap",
             calendarSameDaySwap.checked
                 ? "Choose one working day. You will then choose a replacement shift with exactly the same paid hours."
-                : "Choose the two swap dates in either order. Hé Guǐ will identify the working and off days automatically. Swap hours must match and worked shifts must not overlap."
+                : "Choose the two swap dates in either order. H\u00e9 Gu\u01d0 will identify the working and off days automatically. Swap hours must match and worked shifts must not overlap."
         ],
         add_shift: [setup.type === "casual" ? "Add Casual Shift" : (setup.employmentType === "fulltime" ? "Add Overtime Shift" : "Add Extra Hours"), "Choose one date."],
         roster_change: ["Management Roster Change", "First tap the original working day. Then tap the original RDO. Management changes are only available on No ADO rosters."],
@@ -2097,32 +2176,34 @@ function renderRosterCalendar() {
                 : [];
         if (change?.type === "swap_worked" && (change.sameDay || change.preserveOriginal)) {
             const originalMarkup = change.sameDay
-                ? `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "—")}</span>`
-                : `<span class="calendar-roster-code">${escapeHtml(change.originalCode || originalCode || "—")}</span>`;
-            button.innerHTML = `${originalMarkup}<span class="calendar-roster-code swap-new">${escapeHtml(change.code || "—")}</span>`;
+                ? `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "-")}</span>`
+                : `<span class="calendar-roster-code">${escapeHtml(change.originalCode || originalCode || "-")}</span>`;
+            button.innerHTML = `${originalMarkup}<span class="calendar-roster-code swap-new">${escapeHtml(change.code || "-")}</span>`;
         } else if (change?.type === "swap_off") {
-            button.innerHTML = `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "—")}</span><span class="calendar-roster-code swap-new">${escapeHtml(change.code || "O")}</span>`;
+            button.innerHTML = `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "-")}</span><span class="calendar-roster-code swap-new">${escapeHtml(change.code || "O")}</span>`;
         } else if (codeItems.length) {
             const hideDateNumber = codeItems.length >= 3;
             button.innerHTML = `${hideDateNumber ? "" : `<span class="calendar-date-number">${day}</span>`}${codeItems.map((item) => `<span class="calendar-roster-code${item.extra ? " altered-code" : ""}">${escapeHtml(item.value)}</span>`).join("")}`;
         } else {
-            button.innerHTML = `<span class="calendar-date-number">${day}</span><span class="calendar-roster-code">${escapeHtml(code || "—")}</span>`;
+            button.innerHTML = `<span class="calendar-date-number">${day}</span>${code ? `<span class="calendar-roster-code">${escapeHtml(code)}</span>` : ""}`;
         }
-        const calendarSchoolHoliday = showActSchoolHolidays ? getActSchoolHoliday(date) : "";
-        const calendarPublicHoliday = showActPublicHolidays ? getActPublicHoliday(date) : "";
-        if (calendarSchoolHoliday) {
+        const calendarActSchoolHoliday = showActSchoolHolidays ? getActSchoolHoliday(date) : "";
+        const calendarNswSchoolHoliday = showNswSchoolHolidays ? getNswSchoolHoliday(date) : "";
+        const calendarActPublicHoliday = showActPublicHolidays ? getActPublicHoliday(date) : "";
+        const calendarNswPublicHoliday = showNswPublicHolidays ? getNswPublicHoliday(date) : "";
+        if (calendarActSchoolHoliday || calendarNswSchoolHoliday) {
             const icon = document.createElement("img");
             icon.className = "calendar-school-holiday-icon";
-            icon.src = "school-holidays-icon.png";
+            icon.src = calendarNswSchoolHoliday ? "nsw-school-holidays-icon.svg" : "school-holidays-icon.png";
             icon.alt = "";
-            icon.title = calendarSchoolHoliday;
+            icon.title = calendarNswSchoolHoliday || calendarActSchoolHoliday;
             button.appendChild(icon);
         }
-        if (calendarPublicHoliday) {
+        if (calendarActPublicHoliday || calendarNswPublicHoliday) {
             const marker = document.createElement("span");
-            marker.className = "calendar-public-holiday-marker";
-            marker.textContent = "PH";
-            marker.title = calendarPublicHoliday;
+            marker.className = `calendar-public-holiday-marker${calendarNswPublicHoliday ? " nsw-holiday-text" : ""}`;
+            marker.textContent = calendarNswPublicHoliday && !calendarActPublicHoliday ? "NSW PH" : "PH";
+            marker.title = [calendarActPublicHoliday, calendarNswPublicHoliday && calendarNswPublicHoliday !== calendarActPublicHoliday ? `NSW: ${calendarNswPublicHoliday}` : ""].filter(Boolean).join(" | ");
             button.appendChild(marker);
         }
         const personalEvents = getPersonalCalendarEvents(date);
@@ -2130,7 +2211,7 @@ function renderRosterCalendar() {
             const event = document.createElement("span");
             event.className = "calendar-personal-event";
             event.textContent = personalEvents[0].summary || "Calendar";
-            event.title = personalEvents.map((item) => item.summary || "Calendar event").join(" · ");
+            event.title = personalEvents.map((item) => item.summary || "Calendar event").join(" | ");
             button.appendChild(event);
         }
         button.addEventListener("click", () => chooseRosterCalendarDate(date));
@@ -2286,8 +2367,8 @@ function renderPermanentChangeDateSummary() {
     const action = permanentChangeType.value;
     const ordered = [...pendingCalendarDates].sort((a, b) => a - b);
     document.querySelector("#permanent-change-date").textContent = action === "leave" && ordered.length > 1
-        ? `${formatAustralianDate(ordered[0])}–${formatAustralianDate(ordered[ordered.length - 1])}`
-        : pendingCalendarDates.map(formatAustralianDate).join(" · ");
+        ? `${formatAustralianDate(ordered[0])}-${formatAustralianDate(ordered[ordered.length - 1])}`
+        : pendingCalendarDates.map(formatAustralianDate).join(" | ");
     if (["swap", "roster_change"].includes(action) && pendingCalendarDates.length === 2) {
         swapDayOffDate.value = dateKey(pendingCalendarDates[1]);
         changeDateSummary.innerHTML = action === "swap" && swapType.value === "individual"
@@ -2411,7 +2492,7 @@ function editPermanentChangeDates() {
         ],
         swap: [
             swapType.value === "colleague" ? "Colleague Swap" : "Individual Swap",
-            "Choose the two swap dates in either order. Hé Guǐ will determine their roles automatically."
+            "Choose the two swap dates in either order. H\u00e9 Gu\u01d0 will determine their roles automatically."
         ],
         add_shift: [setup?.employmentType === "fulltime" ? "Overtime" : "Extra Hours", "Choose one date."],
         roster_change: [
@@ -2476,7 +2557,7 @@ function rosterShiftIntervalForDate(date) {
     const parts = String(shift?.time || "").split("-");
     if (parts.length !== 2) return null;
     const interval = shiftInterval(parts[0], parts[1]);
-    return interval ? { ...interval, label: `${shift.code} ${parts[0]}–${parts[1]}`, kind: "roster" } : null;
+    return interval ? { ...interval, label: `${shift.code} ${parts[0]}-${parts[1]}`, kind: "roster" } : null;
 }
 
 function occupiedShiftIntervals(date, excludeId = null, casualMode = false) {
@@ -2486,12 +2567,12 @@ function occupiedShiftIntervals(date, excludeId = null, casualMode = false) {
         if (rosterInterval) intervals.push(rosterInterval);
         getAddedShifts(date).filter((entry) => entry?.id !== excludeId).forEach((entry) => {
             const interval = shiftInterval(entry.start, entry.finish);
-            if (interval) intervals.push({ ...interval, label: `${entry.code} ${entry.start}–${entry.finish}`, kind: "added" });
+            if (interval) intervals.push({ ...interval, label: `${entry.code} ${entry.start}-${entry.finish}`, kind: "added" });
         });
     } else {
         getCasualShifts(date).filter((entry) => entry?.id !== excludeId).forEach((entry) => {
             const interval = shiftInterval(entry.start, entry.finish);
-            if (interval) intervals.push({ ...interval, label: `${entry.code} ${entry.start}–${entry.finish}`, kind: "casual" });
+            if (interval) intervals.push({ ...interval, label: `${entry.code} ${entry.start}-${entry.finish}`, kind: "casual" });
         });
     }
     return intervals.sort((a, b) => a.start - b.start);
@@ -2593,6 +2674,16 @@ function savePermanentChange(addAnother = false) {
     const profileId = profiles[activeProfileIndex].id;
     const records = all[profileId] || {};
     const id = `change-${Date.now()}`;
+
+    // Keep historical editing rules consistent across Casual, Part-time and Full-time.
+    // Once a pay fortnight is finalised, permanent roster changes in that period are locked.
+    if (
+        type !== "add_shift" &&
+        pendingCalendarDates.some((date) => isShiftFinalised(dateKey(date)))
+    ) {
+        alert("That pay fortnight has been finalised and its roster changes are locked.");
+        return;
+    }
 
     if (type === "leave") {
         if (!pendingCalendarDates.length) return;
@@ -3160,7 +3251,7 @@ function calculatePaidMinutes(start, finish, unpaidBreakMinutes = 0) {
 
 function formatPaidMinutes(minutes) {
     if (!Number.isFinite(minutes)) {
-        return "—";
+        return "-";
     }
 
     const hours = Math.floor(minutes / 60);
@@ -3279,7 +3370,7 @@ function renderPayPeriodSummary() {
         }
     });
 
-    payPeriodDates.textContent = `Fortnight: ${formatAustralianDate(period.start)}–${formatAustralianDate(period.end)}`;
+    payPeriodDates.textContent = `Fortnight: ${formatAustralianDate(period.start)} - ${formatAustralianDate(period.end)}`;
     paydayDate.textContent = `Payday: ${formatAustralianDate(period.payday)}`;
 
     if (casual) {
@@ -3389,7 +3480,7 @@ function resetSetup() {
     if (rosterDayHelper) rosterDayHelper.classList.add("hidden");
     if (rosterHelperRows) rosterHelperRows.innerHTML = "";
     if (rosterHelperWeeks) rosterHelperWeeks.innerHTML = "";
-    if (rosterHelperResult) rosterHelperResult.textContent = "Select a row and today’s position.";
+    if (rosterHelperResult) rosterHelperResult.textContent = "Select a row and today's position.";
 
     plannerType.value = "fulltime";
     updateSetupFields();
@@ -3433,7 +3524,7 @@ function displayShift(shift) {
         return code;
     }
 
-    return `${code} · ${time}`;
+    return `${code} - ${time}`;
 }
 
 function friendlyCode(code) {
@@ -3475,7 +3566,7 @@ function friendlyTime(shift) {
 
     const [start, finish] = value.split("-");
 
-    return `${formatClockTime(start)}–${formatClockTime(finish)}`;
+    return `${formatClockTime(start)} - ${formatClockTime(finish)}`;
 }
 
 function formatClockTime(value) {
@@ -3513,9 +3604,9 @@ function printRosterGrid() {
 
     overlay.innerHTML = `
       <aside class="print-settings-panel" style="background:#fff;border-right:1px solid #c8c8c8;padding:18px;overflow:auto">
-        <div style="font-size:22px;font-weight:900;margin-bottom:5px">HÉ GUǏ PLANNER</div>
+        <div style="font-size:22px;font-weight:900;margin-bottom:5px">H&eacute; Gu&#464; PLANNER</div>
         <div style="font-size:12px;line-height:1.35;margin-bottom:18px;color:#444">
-          Personal planning tool. Compare this grid with your employer’s official roster.
+          Personal planning tool. Compare this grid with your employer's official roster.
         </div>
 
         <div style="border-top:1px solid #aaa;padding-top:15px">
@@ -3559,7 +3650,7 @@ function printRosterGrid() {
             Print or Save PDF
           </button>
           <button id="print-test-cancel" type="button" style="width:100%;padding:12px 14px;border:1px solid #555;border-radius:10px;background:#252a30;color:#fff;font-weight:900;font:inherit">
-            Back to Hé Guǐ
+            Back to H&eacute; Gu&#464;
           </button>
         </div>
       </aside>
@@ -3581,7 +3672,7 @@ function printRosterGrid() {
 
     for (let i = -2; i <= 12; i++) {
         const d = addDays(currentBlockStart, i * 28);
-        const label = `${i === 0 ? "Current — " : ""}${d.toLocaleDateString("en-AU", {
+        const label = `${i === 0 ? "Current - " : ""}${d.toLocaleDateString("en-AU", {
             day: "2-digit", month: "short", year: "2-digit"
         })}`;
         const opt = new Option(label, `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
@@ -3620,7 +3711,7 @@ function printRosterGrid() {
             const [y,m,d] = startSelect.value.split("-").map(Number);
             const start = new Date(y,m-1,d);
             const end = addDays(start, Number(count.value) * 28 - 1);
-            info.innerHTML = `<strong>Dated Roster</strong><br>${start.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"2-digit"})} – ${end.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"2-digit"})}`;
+            info.innerHTML = `<strong>Dated Roster</strong><br>${start.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"2-digit"})} &ndash; ${end.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"2-digit"})}`;
         } else {
             info.innerHTML = `<strong>Roster</strong><br>Repeating roster pattern. No calendar dates.`;
         }
@@ -3655,11 +3746,11 @@ function buildRosterPrintDocument(roster, options) {
     let headerArt = "";
     let footerArt = "";
     if (options.theme === "cars") {
-        headerArt = `<div class="art-zone art-header cars"><span>◆</span><span> MOTOR </span><span>◆</span><span> DRIVE </span><span>◆</span></div>`;
-        footerArt = `<div class="art-zone art-footer cars"><span>◆ ◆ ◆</span></div>`;
+        headerArt = `<div class="art-zone art-header cars"><span>&#128663;</span><span>MOTOR</span><span>&#128663;</span><span>DRIVE</span><span>&#128663;</span></div>`;
+        footerArt = `<div class="art-zone art-footer cars"><span>&#128663; &#128663; &#128663;</span></div>`;
     } else if (options.theme === "cats") {
-        headerArt = `<div class="art-zone art-header cats"><span>◢◣ •ᴗ• ◢◣</span><span> ● ● </span><span>◢◣ •ᴗ• ◢◣</span></div>`;
-        footerArt = `<div class="art-zone art-footer cats"><span>●  ●  ●  ●  ●</span></div>`;
+        headerArt = `<div class="art-zone art-header cats"><span>&#128049;</span><span>&#128049;</span><span>&#128049;</span><span>&#128049;</span></div>`;
+        footerArt = `<div class="art-zone art-footer cats"><span>&#128049; &#128049; &#128049; &#128049; &#128049;</span></div>`;
     }
     if (options.block) {
         const rowCount = Math.ceil(roster.shifts.length / 28);
@@ -3707,7 +3798,7 @@ function buildRosterPrintDocument(roster, options) {
                 shifts += `<td class="${cls}"><strong>${escapeHtml(shown)}</strong></td>`;
             }
 
-            content += `<section class="dated-line"><h2>${lineStart.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})} — ${lineEnd.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}</h2><table><tr class="ddd-row">${ddd}</tr><tr class="date-row">${dates}</tr><tr class="shift-row">${shifts}</tr></table></section>`;
+            content += `<section class="dated-line"><h2>${lineStart.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})} &ndash; ${lineEnd.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}</h2><table><tr class="ddd-row">${ddd}</tr><tr class="date-row">${dates}</tr><tr class="shift-row">${shifts}</tr></table></section>`;
         }
     }
 
@@ -3757,12 +3848,12 @@ function buildRosterPrintDocument(roster, options) {
 <header>
   <div>
     <h1>${escapeHtml(roster.name)}</h1>
-    <div class="sub">${roster.shifts.length} roster positions · Printed ${new Date().toLocaleDateString("en-AU")}</div>
+    <div class="sub">${roster.shifts.length} roster positions &middot; Printed ${new Date().toLocaleDateString("en-AU")}</div>
   </div>
-  <div class="sub">HÉ GUǏ PLANNER</div>
+  <div class="sub">H&eacute; Gu&#464; PLANNER</div>
 </header>
 ${headerArt}
-${content}\n<footer>Personal planning tool. Compare this grid with your employer’s official roster. Workplace roster changes must be confirmed with management.</footer>
+${content}\n<footer>Personal planning tool. Compare this grid with your employer's official roster. Workplace roster changes must be confirmed with management.</footer>
 </body>
 </html>`;
 }
@@ -3836,7 +3927,18 @@ function getActSchoolHoliday(date) {
     const holidayPeriod = window.ACT_SCHOOL_HOLIDAYS?.find(
         (period) => key >= period.start && key <= period.end
     );
+    return holidayPeriod?.name || "";
+}
 
+function getNswPublicHoliday(date) {
+    return window.NSW_PUBLIC_HOLIDAYS?.[dateKey(date)] || "";
+}
+
+function getNswSchoolHoliday(date) {
+    const key = dateKey(date);
+    const holidayPeriod = window.NSW_SCHOOL_HOLIDAYS?.find(
+        (period) => key >= period.start && key <= period.end
+    );
     return holidayPeriod?.name || "";
 }
 
@@ -3900,4 +4002,34 @@ window.addEventListener("load", () => {
   logHeguiEvent("app_open", {
     action: "open"
   });
+});
+
+// Ghost Escape integration
+const ghostLauncher = document.querySelector("#ghost-launcher");
+const ghostGameOverlay = document.querySelector("#ghost-game-overlay");
+const ghostGameFrame = document.querySelector("#ghost-game-frame");
+const ghostGameClose = document.querySelector("#ghost-game-close");
+
+function closeGhostEscape() {
+    ghostGameOverlay?.classList.add("hidden");
+    if (ghostGameFrame) ghostGameFrame.src = "about:blank";
+}
+
+function runGhostAcrossHome() {
+    closeGhostEscape();
+    const runner = document.querySelector("#ghost-home-escape");
+    if (!runner) return;
+    runner.classList.remove("run");
+    void runner.offsetWidth;
+    runner.classList.add("run");
+    window.setTimeout(() => runner.classList.remove("run"), 2800);
+}
+
+ghostLauncher?.addEventListener("click", () => {
+    if (ghostGameFrame) ghostGameFrame.src = "ghost-escape/ghost-escape.html";
+    ghostGameOverlay?.classList.remove("hidden");
+});
+ghostGameClose?.addEventListener("click", closeGhostEscape);
+window.addEventListener("message", event => {
+    if (event.data && event.data.type === "hegui-ghost-escaped") runGhostAcrossHome();
 });

@@ -7,25 +7,25 @@
 
     <meta name="theme-color" content="#101214">
 
-    <meta name="application-name" content="Hé Guǐ Planner">
-    <meta name="apple-mobile-web-app-title" content="Hé Guǐ">
+    <meta name="application-name" content="H&eacute; Gu&#464; Planner">
+    <meta name="apple-mobile-web-app-title" content="H&eacute; Gu&#464;">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
 
-    <title>Hé Guǐ Planner</title>
+    <title>H&eacute; Gu&#464; Planner</title>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
    
-    <link rel="stylesheet" href="styles.css?v=29">
+    <link rel="stylesheet" href="styles.css?v=34">
 </head>
 
 <body>
     <div id="startup-splash" class="startup-splash" role="status" aria-live="polite">
         <div class="startup-splash-content">
-            <img src="hegui-logo.png" alt="Hé Guǐ Planner" class="startup-splash-logo">
-            <h1>Hé Guǐ</h1>
+            <img src="Splash1.png" alt="H&eacute; Gu&#464; Planner" class="startup-splash-logo">
+            <h1>H&eacute; Gu&#464;</h1>
             <p class="startup-splash-subtitle">Roster Planner</p>
             <p class="startup-splash-disclaimer">
                 Personal roster planning tool. Always confirm official roster
@@ -45,12 +45,12 @@
 
         <header class="app-header compact-app-header">
     <img
-        src="hegui-icon-192.png"
-        alt="Hé Guǐ"
+        src="Splash2.png"
+        alt="H&eacute; Gu&#464;"
         class="app-logo compact-app-logo"
     >
     <div class="compact-app-title">
-        <h1>Hé Guǐ</h1>
+        <h1>H&eacute; Gu&#464;</h1>
         <p class="subtitle">Roster Planner</p>
     </div>
     <button
@@ -59,19 +59,25 @@
         type="button"
         aria-label="I Heart this app"
     >
-        <span aria-hidden="true">❤️</span> I Heart this app
+        <span aria-hidden="true">&#9829;</span> I Heart this app
     </button>
 </header>
 
         <nav id="profile-tabs" class="profile-tabs" aria-label="Roster profiles">
         </nav>
 
-        <button
-            id="profile-name-button"
-            class="profile-name-button"
-            type="button"
-            aria-label="Rename current profile"
-        ></button>
+        <div class="profile-actions-row">
+            <button
+                id="profile-name-button"
+                class="profile-name-button"
+                type="button"
+                aria-label="Rename current profile"
+            ></button>
+            <button id="ghost-launcher" class="ghost-launcher" type="button" aria-label="Play Ghost Escape" title="Ghost Escape">
+                <span class="ghost-launcher-icon" aria-hidden="true">&#128123;</span>
+                <span>Ghost Escape</span>
+            </button>
+        </div>
 
         <section id="setup-screen" class="screen">
             <div class="card">
@@ -87,8 +93,8 @@
                 <label for="planner-type">Employment type</label>
 
                 <select id="planner-type">
-                    <option value="fulltime">Permanent — Full-time</option>
-                    <option value="parttime">Permanent — Part-time</option>
+                    <option value="fulltime">Permanent - Full-time</option>
+                    <option value="parttime">Permanent - Part-time</option>
                     <option value="casual">Casual Shift Log</option>
                 </select>
 
@@ -112,7 +118,7 @@
 
                 <label class="roster-day-help-toggle">
                     <input id="roster-day-help-checkbox" type="checkbox">
-                    <span>I don’t know it — help me find it</span>
+                    <span>I don't know it - help me find it</span>
                 </label>
 
                 <div id="roster-day-helper" class="roster-day-helper hidden">
@@ -125,7 +131,7 @@
                     <div class="helper-step-label">2. Today is</div>
                     <div id="roster-helper-weeks" class="roster-helper-weeks"></div>
 
-                    <div id="roster-helper-result" class="roster-helper-result">Select a row and today’s position.</div>
+                    <div id="roster-helper-result" class="roster-helper-result">Select a row and today's position.</div>
                 </div>
                 </div>
 
@@ -149,7 +155,7 @@
 
             <article class="shift-card">
                 <span id="edited-dot" class="edited-dot hidden" aria-label="Times edited"></span>
-                <div id="shift-code" class="shift-code">—</div>
+                <div id="shift-code" class="shift-code">-</div>
                 <div id="shift-time" class="shift-time"></div>
                 <div id="roster-name" class="roster-name"></div>
                 <div id="roster-position" class="roster-position"></div>
@@ -184,38 +190,30 @@
             </button>
 
             <div class="navigation-buttons">
-                <button id="previous-day" class="secondary-button">
-                    ‹ Previous
-                </button>
+                <button id="previous-day" class="secondary-button">&#8592; Previous</button>
 
-                <button id="next-day" class="secondary-button">
-                    Next ›
-                </button>
+                <button id="next-day" class="secondary-button">Next &#8594;</button>
             </div>
 
             <section id="week-section" class="week-section">
                 <div class="week-section-heading">
                     <h2>Next 7 Days</h2>
-                    <button id="hide-week-button" class="week-hide-button" type="button" aria-label="Hide 7-day roster" title="Hide 7-day roster">‹</button>
+                    <button id="hide-week-button" class="week-hide-button" type="button" aria-label="Hide 7-day roster" title="Hide 7-day roster">&#9650;</button>
                 </div>
                 <div id="week-list" class="week-list"></div>
             </section>
-            <button id="show-week-button" class="week-show-tab hidden" type="button" aria-label="Show 7-day roster">7 Day ›</button>
+            <button id="show-week-button" class="week-show-tab hidden" type="button" aria-label="Show 7-day roster"> 7 Day &#9660;</button>
 
             <button id="print-roster" class="secondary-button full-width">
                 Print Roster Grid
             </button>
 
-            <button id="settings-button" class="secondary-button full-width">
-    ⚙ Settings
-</button>
+            <button id="settings-button" class="secondary-button full-width">&#9881; Settings</button>
 
-<button id="extras-button" class="secondary-button full-width">
-    ✨ Extras
-</button>
+<button id="extras-button" class="secondary-button full-width">&#10022; Extras</button>
         </section>
         <section id="settings-page" class="modal-page hidden">
-    <h2>⚙ Settings</h2>
+    <h2>&#9881; Settings</h2>
 
     <p>Accessibility</p>
     <p>Display</p>
@@ -247,7 +245,7 @@
     <input id="personal-calendar-name" type="text" placeholder="For example: Personal Calendar">
 
     <label for="personal-calendar-url">ICS URL</label>
-    <input id="personal-calendar-url" type="url" inputmode="url" placeholder="https://…/calendar.ics">
+    <input id="personal-calendar-url" type="url" inputmode="url" placeholder="https://example.com/calendar.ics">
 
     <label class="settings-toggle">
         <input id="personal-calendar-enabled" type="checkbox">
@@ -271,21 +269,21 @@
         Unlock Finalised Shift
     </button>
 
-    <h3>Install Hé Guǐ</h3>
+    <h3>Install H&eacute; Gu&#464;</h3>
 
     <details class="install-help">
-        <summary>📱 How to install Hé Guǐ</summary>
+        <summary>&#9662; How to install H&eacute; Gu&#464;</summary>
         <div class="install-help-content">
-            <p><strong>iPhone / iPad</strong><br>Open Hé Guǐ in Safari, tap Share, then choose <strong>Add to Home Screen</strong>. Launch Hé Guǐ from the new Home Screen icon.</p>
-            <p><strong>Android / Chrome</strong><br>Open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>, then launch Hé Guǐ from the installed icon.</p>
+            <p><strong>iPhone / iPad</strong><br>Open H&eacute; Gu&#464; in Safari, tap Share, then choose <strong>Add to Home Screen</strong>. Launch H&eacute; Gu&#464; from the new Home Screen icon.</p>
+            <p><strong>Android / Chrome</strong><br>Open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>, then launch H&eacute; Gu&#464; from the installed icon.</p>
             <p><strong>Desktop</strong><br>Where supported, use your browser's install option in the address bar or browser menu.</p>
-            <p class="instructions">Hé Guǐ records installed-app use when it is launched in standalone mode from the installed icon.</p>
+            <p class="instructions">H&eacute; Gu&#464; records installed-app use when it is launched in standalone mode from the installed icon.</p>
         </div>
     </details>
 
     <h3>About</h3>
 
-    <p><strong>Hé Guǐ Planner</strong></p>
+    <p><strong>H&eacute; Gu&#464; Planner</strong></p>
 
     <p>Version 1.0 Beta 29 Test</p>
 
@@ -373,7 +371,7 @@
             <div><label for="permanent-finish-time">Finish</label><input id="permanent-finish-time" type="time"></div>
         </div>
         <div id="permanent-auto-adjust-markers" class="auto-adjust-markers hidden" aria-live="polite"></div>
-        <label class="break-option" for="permanent-break"><input id="permanent-break" type="checkbox"><span>Unpaid break — 30 minutes</span></label>
+        <label class="break-option" for="permanent-break"><input id="permanent-break" type="checkbox"><span>Unpaid break - 30 minutes</span></label>
     </div>
     <div id="swap-date-field" class="hidden">
         <p id="change-date-summary" class="date-choice-summary"></p>
@@ -404,9 +402,9 @@
 
     <div class="roster-calendar-card">
         <div class="roster-calendar-head">
-            <button id="calendar-prev" class="calendar-nav" type="button" aria-label="Previous month">‹</button>
+            <button id="calendar-prev" class="calendar-nav" type="button" aria-label="Previous month">&#8592;</button>
             <strong id="calendar-month"></strong>
-            <button id="calendar-next" class="calendar-nav" type="button" aria-label="Next month">›</button>
+            <button id="calendar-next" class="calendar-nav" type="button" aria-label="Next month">&#8594;</button>
         </div>
         <div class="roster-calendar-weekdays">
             <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
@@ -445,11 +443,11 @@
 
     <label class="break-option" for="casual-break">
         <input id="casual-break" type="checkbox">
-        <span>Unpaid break — 30 minutes</span>
+        <span>Unpaid break - 30 minutes</span>
     </label>
 
     <div id="casual-paid-hours" class="paid-hours" aria-live="polite">
-        Paid hours: —
+        Paid hours: -
     </div>
 
     <label for="casual-area">Work area (optional)</label>
@@ -467,70 +465,77 @@
 <section id="availability-test-page" class="modal-page hidden availability-test-page">
     <div class="availability-test-head">
         <div>
-            <h2>Availability — Test</h2>
-            <p class="instructions">Landscape fortnight view · 05:00–21:00 · 30-minute intervals</p>
+            <h2>Availability</h2>
+            <p class="instructions">Fortnight availability view &middot; 05:00&ndash;21:00 &middot; 30-minute intervals</p>
         </div>
-        <button id="close-availability-test" class="secondary-button">Back</button>
+        <div class="availability-head-actions">
+            <button id="print-availability" class="secondary-button">Print</button>
+            <button id="close-availability-test" class="secondary-button">Back</button>
+        </div>
     </div>
     <div class="availability-test-toolbar">
-        <div class="availability-control-group" aria-label="Availability marking controls">
-            <button id="availability-mark-available" class="availability-mode-button active" type="button">Mark Available</button>
-            <button id="availability-mark-unavailable" class="availability-mode-button" type="button">Mark Unavailable</button>
-            <button id="availability-clear-day" class="availability-mode-button" type="button">Clear Day</button>
-        </div>
-        <div class="availability-test-legend">
-            <span><b>Legend:</b></span>
-            <span class="availability-legend available">Available</span>
-            <span class="availability-legend rostered">Rostered / Working</span>
-            <span class="availability-legend unavailable">Unavailable</span>
-        </div>
-        <p class="availability-test-hint">Choose a control, then tap 30-minute blocks. Rostered blocks cannot be changed. This test data is temporary.</p>
+        <p class="availability-test-hint">Tap a day heading: once = Available, twice = Unavailable, three times = clear. Tap individual 30-minute blocks for exceptions. Rostered blocks cannot be changed.</p>
     </div>
     <div id="availability-test-grid" class="availability-grid"></div>
 </section>
 
 <section id="extras-page" class="modal-page hidden">
-    <h2>✨ Extras</h2>
+    <h2>&#10022; Extras</h2>
 
-    <label>
-        <input
-            id="act-public-holidays-checkbox"
-            type="checkbox"
-            checked
-        >
-        ACT Public Holidays
-    </label><br>
-    <label><input type="checkbox"> NSW Public Holidays</label><br>
+    <label class="extra-option-card extra-option-card-compact">
+        <span class="extra-option-copy">
+            <span class="extra-option-title">ACT Public Holidays</span>
+            <span class="extra-option-description">Show ACT public holidays in the planner.</span>
+        </span>
+        <input id="act-public-holidays-checkbox" type="checkbox" checked aria-label="Show ACT public holidays">
+    </label>
+
+    <label class="extra-option-card extra-option-card-compact">
+        <span class="extra-option-copy">
+            <span class="extra-option-title nsw-option-title">NSW Public Holidays</span>
+            <span class="extra-option-description">Show NSW public holidays in the planner.</span>
+        </span>
+        <input id="nsw-public-holidays-checkbox" type="checkbox" aria-label="Show NSW public holidays">
+    </label>
+
     <label class="extra-option-card">
-        <img
-            class="extra-option-preview"
-            src="school-holidays-icon.png"
-            alt="Children playing backyard cricket during the school holidays"
-        >
+        <img class="extra-option-preview" src="school-holidays-icon.png" alt="Children playing backyard cricket during the school holidays">
         <span class="extra-option-copy">
             <span class="extra-option-title">ACT School Holidays</span>
-            <span class="extra-option-description">
-                Show school-holiday dates and the picture in your 7-day roster.
-            </span>
+            <span class="extra-option-description">Show ACT school-holiday dates and the picture in your roster views.</span>
         </span>
-        <input
-            id="act-school-holidays-checkbox"
-            type="checkbox"
-            aria-label="Show ACT school holidays"
-        >
+        <input id="act-school-holidays-checkbox" type="checkbox" aria-label="Show ACT school holidays">
     </label>
-    <label><input type="checkbox"> NSW School Holidays</label><br>
-    <label><input type="checkbox"> Notifications</label><br>
-    <label><input type="checkbox"> Google Calendar</label>
 
-    <br><br>
+    <label class="extra-option-card">
+        <img class="extra-option-preview" src="nsw-school-holidays-icon.svg" alt="Children with the Sydney Harbour Bridge for NSW school holidays">
+        <span class="extra-option-copy">
+            <span class="extra-option-title nsw-option-title">NSW School Holidays</span>
+            <span class="extra-option-description">Show NSW school-holiday dates and the blue NSW picture in your roster views.</span>
+        </span>
+        <input id="nsw-school-holidays-checkbox" type="checkbox" aria-label="Show NSW school holidays">
+    </label>
 
-    <button id="open-availability-test" class="secondary-button full-width">Availability Test</button>
+    <label class="extra-option-card extra-option-card-compact">
+        <span class="extra-option-copy">
+            <span class="extra-option-title">Notifications</span>
+            <span class="extra-option-description">Optional planner reminders and notifications.</span>
+        </span>
+        <input id="notifications-checkbox" type="checkbox" aria-label="Enable notifications">
+    </label>
+
+    <button id="open-availability-test" class="secondary-button full-width">Availability</button>
 
     <button id="close-extras" class="primary-button">
         Close
     </button>
 </section>
+        <section id="ghost-game-overlay" class="ghost-game-overlay hidden" aria-label="Ghost Escape game">
+            <button id="ghost-game-close" class="ghost-game-close" type="button">&#8592; Back to H&eacute; Gu&#464;</button>
+            <iframe id="ghost-game-frame" class="ghost-game-frame" title="Ghost Escape"></iframe>
+        </section>
+        <div id="ghost-home-escape" class="ghost-home-escape" aria-hidden="true">&#128123;</div>
+
                 <footer>
             <p class="authors">
                 Authors: James Gideon
@@ -540,8 +545,8 @@
 
     </main>
 
-    <script src="holidays.js?v=1"></script>
-    <script src="logger.js?v=1"></script>
-    <script src="app.js?v=29"></script>
+    <script src="holidays.js?v=2"></script>
+    <script src="logger.js?v=2"></script>
+    <script src="app.js?v=43"></script>
 </body>
 </html>

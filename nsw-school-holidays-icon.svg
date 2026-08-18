@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="NSW school holidays - children and Sydney Harbour Bridge">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1688df"/><stop offset="1" stop-color="#07539a"/></linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="22" fill="url(#sky)"/>
+  <circle cx="128" cy="28" r="13" fill="#ffd34d"/>
+  <path d="M20 89h120M30 89C46 38 114 38 130 89M43 89C55 57 105 57 117 89" fill="none" stroke="#dff3ff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M25 89v18M135 89v18M47 66v41M113 66v41" stroke="#dff3ff" stroke-width="4"/>
+  <path d="M0 112c31-7 55 5 80 1s49-13 80-1v48H0z" fill="#043a70"/>
+  <g fill="#eaf7ff" stroke="#eaf7ff" stroke-linecap="round">
+    <circle cx="51" cy="108" r="7"/><path d="M51 116v20M51 122l-11 9M51 122l10 8M51 136l-8 14M51 136l9 14" stroke-width="5"/>
+    <circle cx="81" cy="103" r="7"/><path d="M81 111v23M81 117l-12-8M81 117l12-9M81 134l-9 16M81 134l9 16" stroke-width="5"/>
+    <circle cx="111" cy="109" r="7"/><path d="M111 117v19M111 123l-10 7M111 123l11 8M111 136l-8 14M111 136l9 14" stroke-width="5"/>
+  </g>
+  <text x="80" y="153" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#bfe7ff">NSW SCHOOL HOLIDAYS</text>
+</svg>

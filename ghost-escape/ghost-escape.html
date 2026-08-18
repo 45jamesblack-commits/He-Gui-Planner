@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101214">
+  <title>H&eacute; Gu&#464;: Ghost Escape</title>
+  <link rel="stylesheet" href="ghost-escape.css?v=3">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="game-header">
+      <div>
+        <p class="eyebrow">H&eacute; Gu&#464; Mini Game</p>
+        <h1>&#128123; Ghost Escape</h1>
+        <p class="subtitle">Free H&eacute; Gu&#464; before the Boss Monster gets too close.</p>
+      </div>
+      <button id="new-game" class="small-button" type="button">New Game</button>
+    </header>
+
+    <section class="game-options">
+      <label for="theme-select">Theme</label>
+      <select id="theme-select">
+        <option value="animals">Animals</option>
+        <option value="food">Food</option>
+        <option value="nature">Nature</option>
+        <option value="australia">Australia</option>
+        <option value="mystery">Mystery</option>
+      </select>
+    </section>
+
+    <section class="difficulty-card" aria-label="Difficulty">
+      <button class="difficulty active" data-level="easy" type="button">Easy<br><span>5 letters &middot; 8 misses</span></button>
+      <button class="difficulty" data-level="medium" type="button">Medium<br><span>7 letters &middot; 7 misses</span></button>
+      <button class="difficulty" data-level="hard" type="button">Hard<br><span>9 letters &middot; 6 misses</span></button>
+    </section>
+
+    <section class="arena-card" aria-live="polite">
+      <div class="arena">
+        <div id="ghost" class="ghost" aria-label="H&eacute; Gu&#464; ghost">&#128123;</div>
+        <div class="trap" aria-hidden="true">
+          <span class="trap-bar trap-top"></span>
+          <span class="trap-bar trap-left"></span>
+          <span class="trap-bar trap-right"></span>
+          <span class="trap-bar trap-bottom"></span>
+          <span class="trap-seal">&#128274;</span>
+        </div>
+        <div id="boss" class="boss" aria-label="Boss Monster">&#128121;</div>
+        <div id="boss-fire" class="boss-fire" aria-hidden="true">&#128293;</div>
+      </div>
+      <div class="danger-track" aria-label="Boss Monster progress">
+        <div id="danger-fill" class="danger-fill"></div>
+      </div>
+      <p id="status-line" class="status-line">Choose a letter to begin.</p>
+    </section>
+
+    <section class="word-card">
+      <div id="word" class="word" aria-label="Word"></div>
+      <div class="meta-row">
+        <span>Wrong: <strong id="wrong-count">0</strong>/<strong id="max-wrong">8</strong></span>
+        <span>Streak: <strong id="streak">0</strong></span>
+        <span>Best: <strong id="best-streak">0</strong></span>
+        <span>Perfect: <strong id="perfect-count">0</strong></span>
+      </div>
+    </section>
+
+    <section id="keyboard" class="keyboard" aria-label="Letter keyboard"></section>
+
+    <section id="result-card" class="result-card hidden" aria-live="assertive">
+      <h2 id="result-title"></h2>
+      <p id="result-message"></p>
+      <p id="revealed-word" class="revealed-word"></p>
+      <button id="play-again" class="primary-button" type="button">Play Again</button>
+    </section>
+
+    <footer>
+      <p>No ads. No timers. No streak pressure. Just a ghost, a word, and one very unimpressed Boss Monster.</p>
+    </footer>
+  </main>
+
+  <script src="ghost-words.js?v=2"></script>
+  <script src="ghost-escape.js?v=3"></script>
+</body>
+</html>

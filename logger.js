@@ -1,4 +1,4 @@
-// Hé Guǐ Planner - Usage Logger
+﻿// He Gui Planner - Usage Logger
 const HEGUI_APP_VERSION = "24";
 const HEGUI_LOGGER_URL =
   "https://uxkwtmbdxtsynvblyazq.supabase.co";
@@ -65,14 +65,14 @@ async function logHeguiEvent(eventType, options = {}) {
 
     if (!response.ok) {
       console.warn(
-        "Hé Guǐ logger:",
+        "He Gui logger:",
         response.status,
         await response.text()
       );
     }
   } catch (error) {
     // Logging must never interfere with the planner.
-    console.warn("Hé Guǐ logger unavailable:", error);
+    console.warn("He Gui logger unavailable:", error);
   }
 }
 

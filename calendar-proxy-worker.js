@@ -1,5 +1,5 @@
-/**
- * Hé Guǐ Personal Calendar proxy — Cloudflare Worker
+﻿/**
+ * He Gui Personal Calendar proxy - Cloudflare Worker
  *
  * Deploy this Worker once, then copy its https://...workers.dev URL into
  * PERSONAL_CALENDAR_PROXY_URL near the top of app.js.
@@ -63,7 +63,7 @@ export default {
     if (calendarUrl.protocol !== "https:") return response("HTTPS calendar URLs only", 400, origin);
 
     // Prevent this tiny proxy from becoming a general-purpose open proxy.
-    // Add another trusted calendar hostname here later if Hé Guǐ supports it.
+    // Add another trusted calendar hostname here later if He Gui supports it.
     const allowedCalendarHosts = new Set([
       "calendar.google.com",
       "www.google.com"

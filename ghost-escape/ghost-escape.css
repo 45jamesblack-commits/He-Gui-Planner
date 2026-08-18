@@ -1,0 +1,72 @@
+:root {
+  --bg:#101214;
+  --panel:#1b1f23;
+  --panel2:#23282e;
+  --border:#4b525a;
+  --amber:#ffb020;
+  --amber-light:#ffc44d;
+  --text:#fff;
+  --muted:#b9c0c7;
+  --danger:#ff6b6b;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#20252a 0%,var(--bg) 45%);color:var(--text)}
+button{font:inherit;cursor:pointer}
+.game-shell{width:min(100%,560px);margin:0 auto;padding:24px 16px 40px}
+.game-header{display:flex;gap:14px;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.eyebrow{margin:0 0 4px;color:var(--amber);font-size:.78rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+h1{margin:0;font-size:clamp(2rem,8vw,3rem)}
+.subtitle{margin:6px 0 0;color:var(--muted);line-height:1.4}
+.small-button,.difficulty,.primary-button,.key{border:1px solid var(--border);border-radius:13px;background:var(--panel2);color:var(--text);font-weight:850}
+.small-button{padding:10px 12px;white-space:nowrap}
+.game-options{display:flex;align-items:center;gap:10px;margin-bottom:10px}.game-options label{font-weight:850;color:var(--muted)}.game-options select{flex:1;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:13px;background:var(--panel2);color:var(--text);font:inherit;font-weight:800}.difficulty-card{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.difficulty{padding:12px 7px;line-height:1.15}
+.difficulty span{display:block;margin-top:5px;color:var(--muted);font-size:.68rem;font-weight:650}
+.difficulty.active{border-color:var(--amber);background:rgba(255,176,32,.13);color:var(--amber-light)}
+.arena-card,.word-card,.result-card{border:1px solid var(--border);border-radius:20px;background:linear-gradient(145deg,#20252a,var(--panel));box-shadow:0 14px 30px rgba(0,0,0,.24)}
+.arena-card{padding:16px;margin-bottom:14px}
+.arena{position:relative;height:190px;overflow:hidden;border-radius:16px;background:linear-gradient(#171b1f,#101214)}
+.ghost,.boss{position:absolute;bottom:28px;font-size:4.6rem;transition:transform .35s ease,left .35s ease,right .35s ease,filter .35s ease}
+.ghost{left:12%;z-index:2;filter:drop-shadow(0 0 12px rgba(255,255,255,.16))}
+.boss{right:8%;transform:scale(.9)}
+.trap{position:absolute;left:9%;bottom:18px;width:115px;height:130px;z-index:3;pointer-events:none}
+.trap-bar{position:absolute;background:rgba(255,176,32,.72);box-shadow:0 0 10px rgba(255,176,32,.2);opacity:.22;transition:opacity .25s ease}
+.trap-top,.trap-bottom{left:0;width:100%;height:6px}
+.trap-top{top:0}.trap-bottom{bottom:0}
+.trap-left,.trap-right{top:0;width:6px;height:100%}
+.trap-left{left:0}.trap-right{right:0}
+.trap-seal{position:absolute;top:46px;left:42px;padding:5px 8px;border:2px solid rgba(255,176,32,.75);color:var(--amber-light);font-weight:900;opacity:.2;transform:rotate(-8deg);transition:opacity .25s ease}
+.arena[data-danger="1"] .trap-top,.arena[data-danger="2"] .trap-left,.arena[data-danger="3"] .trap-right,.arena[data-danger="4"] .trap-bottom,.arena[data-danger="5"] .trap-seal{opacity:1}
+.arena[data-danger="6"] .trap-bar,.arena[data-danger="6"] .trap-seal,.arena[data-danger="7"] .trap-bar,.arena[data-danger="7"] .trap-seal,.arena[data-danger="8"] .trap-bar,.arena[data-danger="8"] .trap-seal{opacity:1}
+.danger-track{height:10px;margin-top:12px;border-radius:999px;background:#0e1012;overflow:hidden;border:1px solid #30363c}
+.danger-fill{height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--danger));transition:width .3s ease}
+.status-line{margin:10px 0 0;text-align:center;color:var(--muted);font-weight:750}
+.word-card{padding:20px 14px 14px;margin-bottom:14px;text-align:center}
+.word{display:flex;justify-content:center;flex-wrap:wrap;gap:7px;min-height:56px}
+.letter-slot{display:grid;place-items:center;width:34px;height:46px;border-bottom:4px solid var(--amber);font-size:1.7rem;font-weight:950}
+.meta-row{display:flex;justify-content:space-around;gap:8px;flex-wrap:wrap;margin-top:16px;color:var(--muted);font-size:.9rem}
+.keyboard{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
+.key{min-height:44px;padding:4px}.key:disabled{opacity:.32;cursor:default}.key.correct{border-color:#54c47a;color:#7ae89a}.key.wrong{border-color:var(--danger);color:#ff9a9a}
+.result-card{margin-top:16px;padding:20px;text-align:center}.result-card h2{margin:0 0 8px}.result-card p{line-height:1.45}.revealed-word{color:var(--amber-light);font-size:1.2rem;font-weight:900}.primary-button{width:100%;min-height:52px;margin-top:8px;border:0;background:var(--amber);color:#101214}.hidden{display:none!important}
+.arena.win .ghost{left:65%;transform:scale(1.18) rotate(8deg)}.arena.win .boss{right:-22%;transform:rotate(15deg) scale(.7);filter:blur(1px)}
+.arena.lose .ghost{filter:grayscale(.6);transform:translateY(8px) scale(.88)}.arena.lose .boss{transform:scale(1.25)}
+
+/* Boss endings: He Gui chases a defeated boss; a winning boss uses a torch. */
+.boss-fire{position:absolute;right:25%;bottom:52px;z-index:5;font-size:3.4rem;opacity:0;pointer-events:none;transform:rotate(-25deg) scale(.5);filter:drop-shadow(0 0 12px rgba(255,120,0,.8))}
+.boss-fire.active{opacity:1;animation:bossTorch 3s ease-in-out both}
+.arena.ghost-chase .ghost{animation:ghostChase 4.2s ease-in-out both;z-index:5}
+.arena.ghost-chase .boss{animation:bossFlee 4.2s ease-in-out both}
+.arena.perfect-win::after{content:"\1F3C6 \2728 \1F3C6";position:absolute;top:12px;left:0;right:0;z-index:7;text-align:center;font-size:2rem;animation:perfectPrize 1s ease-in-out infinite alternate;pointer-events:none}
+.arena.perfect-win .ghost{filter:drop-shadow(0 0 16px rgba(255,215,0,.9))}
+@keyframes perfectPrize{from{transform:translateY(3px) scale(.92);opacity:.72}to{transform:translateY(-4px) scale(1.08);opacity:1}}
+.arena.boss-burn .boss{animation:bossAttack 3s ease-in-out both;z-index:4}
+.arena.boss-burn .ghost{animation:ghostBurn 3s ease-in-out both}
+@keyframes ghostChase{0%{left:10%;transform:scale(1)}20%{left:72%;transform:scale(1.12)}38%{left:12%;transform:scale(1.08) scaleX(-1)}56%{left:72%;transform:scale(1.14)}74%{left:12%;transform:scale(1.08) scaleX(-1)}92%,100%{left:76%;transform:scale(1.18)}}
+@keyframes bossFlee{0%{right:8%;transform:scale(.9)}20%{right:72%;transform:rotate(-10deg) scale(.85)}38%{right:8%;transform:rotate(10deg) scale(.85)}56%{right:72%;transform:rotate(-10deg) scale(.82)}74%{right:8%;transform:rotate(10deg) scale(.8)}92%,100%{right:-28%;transform:rotate(18deg) scale(.68)}}
+@keyframes bossAttack{0%{right:8%;transform:scale(.9)}35%,80%{right:28%;transform:scale(1.18)}100%{right:22%;transform:scale(1.1)}}
+@keyframes bossTorch{0%,18%{opacity:0;right:24%;transform:rotate(-25deg) scale(.5)}35%,75%{opacity:1;right:48%;transform:rotate(-45deg) scale(1.15)}100%{opacity:0;right:50%;transform:rotate(-45deg) scale(.8)}}
+@keyframes ghostBurn{0%,25%{filter:drop-shadow(0 0 12px rgba(255,255,255,.16));transform:scale(1)}55%{filter:sepia(1) saturate(5) hue-rotate(330deg) brightness(1.4);transform:scale(.9) rotate(-8deg)}100%{filter:grayscale(1) brightness(.45);transform:translateY(16px) scale(.72) rotate(12deg);opacity:.45}}
+footer{margin-top:24px;color:#8f979f;font-size:.8rem;line-height:1.4;text-align:center}
+@media(max-width:420px){.game-header{align-items:flex-start}.small-button{font-size:.8rem;padding:8px}.difficulty{font-size:.82rem}.keyboard{grid-template-columns:repeat(6,1fr)}.ghost,.boss{font-size:4rem}.arena{height:175px}}
+@media(max-height:700px) and (max-width:430px){body.playing .game-header{display:none}body.playing .game-options{display:none}body.playing .difficulty-card{display:none}body.playing .arena-card{padding:8px 12px;margin-bottom:8px}body.playing .arena{height:52px}body.playing .ghost{font-size:2rem;bottom:5px;left:15%}body.playing .boss{font-size:2rem;bottom:5px;right:15%}body.playing .trap{display:none}body.playing .danger-track{margin-top:5px;height:7px}body.playing .status-line{margin:4px 0 0;font-size:.78rem}body.playing .word-card{padding:10px 8px 8px;margin-bottom:8px}body.playing .letter-slot{height:38px;font-size:1.45rem}body.playing .meta-row{margin-top:8px;font-size:.8rem}body.playing .key{min-height:40px}body.playing footer{display:none}}
