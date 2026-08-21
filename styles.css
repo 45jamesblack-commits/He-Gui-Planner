@@ -981,9 +981,9 @@ button.action-locked { opacity:.45; cursor:not-allowed; }
 
 .startup-splash-logo {
     display: block;
-    width: min(200%, 800px);
-    max-width: none;
-    transform: translateX(-25%);
+    width: min(100%, 400px);
+    max-width: 100%;
+    transform: none;
     margin: 0 auto 20px;
     border-radius: 16px;
 }
@@ -1018,7 +1018,7 @@ button.action-locked { opacity:.45; cursor:not-allowed; }
 }
 
 .compact-app-logo {
-    width: 100px;
+    width: 115px;
     height: 92px;
     aspect-ratio: auto;
     margin: 0;
