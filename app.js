@@ -64,6 +64,7 @@ const profileNameButton = document.querySelector("#profile-name-button");
 const appHeartButton = document.querySelector("#app-heart-button");
 const settingsButton = document.querySelector("#settings-button");
 const extrasButton = document.querySelector("#extras-button");
+const shareAppButton = document.querySelector("#share-app-button");
 const settingsPage = document.querySelector("#settings-page");
 const extrasPage = document.querySelector("#extras-page");
 const closeSettings = document.querySelector("#close-settings");
@@ -664,6 +665,29 @@ extrasButton.addEventListener("click", () => {
 
 closeExtras.addEventListener("click", () => {
     extrasPage.classList.add("hidden");
+});
+
+shareAppButton?.addEventListener("click", async () => {
+    const shareUrl = "https://heguiplanner.com";
+    const shareTitle = "Hé Guǐ Planner";
+    const shareText = "Have a look at Hé Guǐ Planner.";
+
+    // Record only that the external share feature was used. Never record
+    // recipients, contacts, chosen apps, or message contents.
+    window.logHeguiEvent?.("share_app", { action: "share_button" });
+
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+            return;
+        } catch (error) {
+            if (error?.name === "AbortError") return;
+        }
+    }
+
+    const subject = encodeURIComponent(shareTitle);
+    const body = encodeURIComponent(`${shareText}\n\n${shareUrl}`);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
 });
 
 const savedActPublicHolidayPreference =
