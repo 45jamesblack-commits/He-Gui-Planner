@@ -64,6 +64,7 @@ const profileNameButton = document.querySelector("#profile-name-button");
 const appHeartButton = document.querySelector("#app-heart-button");
 const settingsButton = document.querySelector("#settings-button");
 const extrasButton = document.querySelector("#extras-button");
+const supportFormButton = document.querySelector("#support-form-button");
 const shareAppButton = document.querySelector("#share-app-button");
 const settingsPage = document.querySelector("#settings-page");
 const extrasPage = document.querySelector("#extras-page");
@@ -665,6 +666,14 @@ extrasButton.addEventListener("click", () => {
 
 closeExtras.addEventListener("click", () => {
     extrasPage.classList.add("hidden");
+});
+
+supportFormButton?.addEventListener("click", () => {
+    const supportFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSd0lVGtFQ4tfnIxQrkdTU-TNpZKaPKhmHY3gFer1eAl4dDgBA/viewform";
+    window.logHeguiEvent?.("support_form_open", { source: "extras" });
+
+    const supportWindow = window.open(supportFormUrl, "_blank", "noopener,noreferrer");
+    if (!supportWindow) window.location.href = supportFormUrl;
 });
 
 shareAppButton?.addEventListener("click", async () => {
