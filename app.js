@@ -668,9 +668,9 @@ closeExtras.addEventListener("click", () => {
 });
 
 shareAppButton?.addEventListener("click", async () => {
-    const shareUrl = "https://heguiplanner.com";
+    const shareUrl = "https://heguiplanner.com/";
     const shareTitle = "Hé Guǐ Planner";
-    const shareText = "Have a look at Hé Guǐ Planner.";
+    const shareText = "Hé Guǐ Planner helps you organise your personal plans alongside your work roster.";
 
     // Record only that the external share feature was used. Never record
     // recipients, contacts, chosen apps, or message contents.
@@ -685,9 +685,28 @@ shareAppButton?.addEventListener("click", async () => {
         }
     }
 
-    const subject = encodeURIComponent(shareTitle);
-    const body = encodeURIComponent(`${shareText}\n\n${shareUrl}`);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    const copyText = `${shareText}\n\n${shareUrl}`;
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(copyText);
+        } else {
+            const copyArea = document.createElement("textarea");
+            copyArea.value = copyText;
+            copyArea.setAttribute("readonly", "");
+            copyArea.style.position = "fixed";
+            copyArea.style.opacity = "0";
+            document.body.appendChild(copyArea);
+            copyArea.select();
+            const copied = document.execCommand("copy");
+            copyArea.remove();
+            if (!copied) throw new Error("Copy command failed");
+        }
+
+        alert("Link copied — paste it into a message or email.");
+    } catch (error) {
+        alert(`Copy this link to share Hé Guǐ Planner:\n\n${shareUrl}`);
+    }
 });
 
 const savedActPublicHolidayPreference =
