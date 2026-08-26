@@ -6,7 +6,7 @@ window.GHOST_WORDS = {
   },
   australia: {
     easy: ["BEACH","BILBY","CORAL","DINGO","EMU??"].filter(w => w.length === 5).concat(["KOALA","OPERA","REEFS","ULURU"]),
-    medium: ["BRISBNE","BUSHMAN","COCKATU","DARLING","OUTBACKS","WALLABY"].filter(w => w.length === 7),
+    medium: ["BRISBANE","BUSHMAN","COCKATOO","DARLING","OUTBACK","WALLABY"].filter(w => w.length === 7),
     hard: ["AUSTRALIA","BILLABONG","BUSHFIRES","KANGAROOS","PLATYPUSS"].filter(w => w.length === 9)
   },
   food: {
