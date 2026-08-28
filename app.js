@@ -638,6 +638,16 @@ async function savePersonalCalendarSettings() {
     if (!/^https?:$/.test(parsedUrl.protocol)) { alert("Please use an http, https or webcal ICS calendar URL."); personalCalendarUrl?.focus(); return; }
     const saved = { name, url, enabled: Boolean(personalCalendarEnabled?.checked) };
     localStorage.setItem(STORAGE_PERSONAL_CALENDAR, JSON.stringify(saved));
+    const calendarProvider = /(^|\.)google\.com$|(^|\.)googleusercontent\.com$/i.test(parsedUrl.hostname)
+        ? "google"
+        : "other";
+    window.logHeguiEvent?.("calendar_added", {
+        action: "personal_calendar_saved",
+        details: {
+            provider: calendarProvider,
+            enabled: saved.enabled
+        }
+    });
     if (saved.enabled) await refreshPersonalCalendar(true);
     else if (personalCalendarStatus) personalCalendarStatus.textContent = "Personal calendar saved but disabled.";
 }
@@ -1485,6 +1495,13 @@ function beginSetupCheck() {
         setup = { type: "casual" };
         profiles[activeProfileIndex].setup = setup;
         saveProfiles();
+        logHeguiEvent("roster_selected", {
+            action: "setup_saved",
+            details: {
+                employment_type: "casual",
+                profile_slot: activeProfileIndex + 1
+            }
+        });
         selectedDate = startOfDay(new Date());
         showHomeScreen();
         return;
@@ -1539,7 +1556,8 @@ logHeguiEvent("roster_selected", {
   details: {
     roster_index: rosterIndex,
     anchor_position: anchorPosition,
-    employment_type: plannerType.value
+    employment_type: plannerType.value,
+    profile_slot: activeProfileIndex + 1
   }
 });
     selectedDate = anchorDate;
@@ -4078,6 +4096,9 @@ function runGhostAcrossHome() {
 }
 
 ghostLauncher?.addEventListener("click", () => {
+    window.logHeguiEvent?.("ghost_escape_open", {
+        action: "play_game"
+    });
     if (ghostGameFrame) ghostGameFrame.src = "ghost-escape/ghost-escape.html";
     ghostGameOverlay?.classList.remove("hidden");
 });
