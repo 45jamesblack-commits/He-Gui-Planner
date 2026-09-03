@@ -501,6 +501,7 @@ function parseIcsEvents(text) {
             case "UID": current.uid = value; break;
             case "SUMMARY": current.summary = decodeIcsText(value) || "Calendar event"; break;
             case "LOCATION": current.location = decodeIcsText(value); break;
+            case "DESCRIPTION": current.description = decodeIcsText(value); break;
             case "DTSTART": current.start = parseIcsDateValue(value, params); break;
             case "DTEND": current.end = parseIcsDateValue(value, params); break;
             case "RRULE": current.rrule = parseRRule(value); break;
@@ -580,6 +581,69 @@ function getPersonalCalendarEvents(date) {
     try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
     if (!saved.enabled) return [];
     return personalCalendarEvents.filter((event) => personalEventOccursOnDate(event, date));
+}
+
+function personalCalendarEventTime(event) {
+    if (event.start?.allDay) return "All day";
+    const start = event.start?.iso ? new Date(event.start.iso) : null;
+    const end = event.end?.iso ? new Date(event.end.iso) : null;
+    if (!start || Number.isNaN(start.getTime())) return "";
+    const clock = (value) => value.toLocaleTimeString("en-AU", {
+        hour: "numeric",
+        minute: "2-digit"
+    });
+    return end && !Number.isNaN(end.getTime())
+        ? `${clock(start)} - ${clock(end)}`
+        : clock(start);
+}
+
+function closePersonalCalendarDetail() {
+    document.querySelector(".personal-calendar-detail-overlay")?.remove();
+}
+
+function openPersonalCalendarDetail(date, events = getPersonalCalendarEvents(date)) {
+    if (!events.length) return;
+    closePersonalCalendarDetail();
+
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
+    const overlay = document.createElement("div");
+    overlay.className = "personal-calendar-detail-overlay";
+    overlay.innerHTML = `
+        <section class="personal-calendar-detail-panel" role="dialog" aria-modal="true" aria-labelledby="personal-calendar-detail-title">
+            <div class="personal-calendar-detail-head">
+                <div>
+                    <span class="personal-calendar-detail-label">${escapeHtml(saved.name || "Personal Calendar")}</span>
+                    <h2 id="personal-calendar-detail-title">${escapeHtml(date.toLocaleDateString("en-AU", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric"
+                    }))}</h2>
+                </div>
+                <button type="button" class="personal-calendar-detail-close" aria-label="Close calendar details">&times;</button>
+            </div>
+            <div class="personal-calendar-detail-list">
+                ${events.map((event) => `
+                    <article class="personal-calendar-detail-event">
+                        <h3>${escapeHtml(event.summary || "Calendar event")}</h3>
+                        ${personalCalendarEventTime(event) ? `<p class="personal-calendar-detail-time">${escapeHtml(personalCalendarEventTime(event))}</p>` : ""}
+                        ${event.location ? `<p><strong>Location:</strong> ${escapeHtml(event.location)}</p>` : ""}
+                        ${event.description ? `<p class="personal-calendar-detail-description">${escapeHtml(event.description)}</p>` : ""}
+                    </article>
+                `).join("")}
+            </div>
+            <button type="button" class="primary-button personal-calendar-detail-done">Close</button>
+        </section>
+    `;
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay || event.target.closest(".personal-calendar-detail-close, .personal-calendar-detail-done")) {
+            closePersonalCalendarDetail();
+        }
+    });
+    document.body.appendChild(overlay);
+    overlay.querySelector(".personal-calendar-detail-close")?.focus();
 }
 
 async function fetchPersonalCalendarIcs(calendarUrl) {
@@ -1794,7 +1858,7 @@ function renderWeek() {
 
         const personalEvents = getPersonalCalendarEvents(date);
         const personalEventMarkup = personalEvents.length
-            ? `<span class="week-personal-events">${personalEvents.slice(0, 2).map((event) => `<span>${escapeHtml(event.summary || "Calendar event")}</span>`).join("")}${personalEvents.length > 2 ? `<span>+${personalEvents.length - 2} more</span>` : ""}</span>`
+            ? `<span class="week-personal-events" title="Tap to enlarge calendar details" aria-label="Open calendar details for ${escapeHtml(formatAustralianDate(date))}">${personalEvents.slice(0, 2).map((event) => `<span>${escapeHtml(event.summary || "Calendar event")}</span>`).join("")}${personalEvents.length > 2 ? `<span>+${personalEvents.length - 2} more</span>` : ""}<span class="personal-calendar-enlarge-cue" aria-hidden="true">&#x2922;</span></span>`
             : "";
 
         row.innerHTML = `
@@ -1810,7 +1874,11 @@ function renderWeek() {
             <span class="week-day-shift">${shiftMarkup}${personalEventMarkup}</span>
         `;
 
-        row.addEventListener("click", () => {
+        row.addEventListener("click", (event) => {
+            if (personalEvents.length && event.target.closest(".week-personal-events")) {
+                openPersonalCalendarDetail(date, personalEvents);
+                return;
+            }
             selectedDate = date;
             renderHome();
             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2281,7 +2349,16 @@ function renderRosterCalendar() {
             const event = document.createElement("span");
             event.className = "calendar-personal-event";
             event.textContent = personalEvents[0].summary || "Calendar";
-            event.title = personalEvents.map((item) => item.summary || "Calendar event").join(" | ");
+            event.title = "Tap to enlarge calendar details";
+            event.setAttribute("aria-label", `Open calendar details for ${formatAustralianDate(date)}`);
+            event.appendChild(Object.assign(document.createElement("span"), {
+                className: "personal-calendar-enlarge-cue",
+                innerHTML: "&#x2922;"
+            }));
+            event.addEventListener("click", (clickEvent) => {
+                clickEvent.stopPropagation();
+                openPersonalCalendarDetail(date, personalEvents);
+            });
             button.appendChild(event);
         }
         button.addEventListener("click", () => chooseRosterCalendarDate(date));
