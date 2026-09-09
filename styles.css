@@ -1267,16 +1267,21 @@ body {
 }
 .calendar-personal-event {
     display: block;
-    max-width: 92%;
-    margin-top: 2px;
-    overflow: hidden;
-    color: var(--amber-light);
-    font-size: .48rem;
-    font-weight: 800;
-    line-height: 1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    width: 9px;
+    height: 9px;
+    margin: 3px auto 0;
+    border-radius: 50%;
+    background: #4f9cff;
+    color: #fff;
+    font-size: .58rem;
+    font-weight: 900;
+    line-height: 18px;
+    text-align: center;
     cursor: zoom-in;
+}
+.calendar-personal-event.multiple {
+    width: 18px;
+    height: 18px;
 }
 
 .week-personal-events {
@@ -1389,6 +1394,57 @@ body {
 .personal-calendar-detail-description {
     white-space: pre-line;
 }
+
+.personal-calendar-detail-actions,
+.planner-event-heading,
+.planner-form-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.personal-calendar-detail-actions { align-items: flex-start; }
+.personal-calendar-detail-actions .secondary-button { min-height: 44px; margin: 0; }
+.planner-event-heading { justify-content: space-between; }
+.planner-event-heading h3 { margin-right: auto; }
+
+.planner-holidays {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    background: var(--card-light);
+}
+.planner-holidays strong { color: var(--amber-light); }
+
+.planner-event-form {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card-light);
+}
+.planner-event-form label { display: grid; gap: 6px; font-weight: 800; }
+.planner-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.planner-form-buttons { justify-content: flex-end; }
+.planner-event-form input,
+.planner-event-form select { width: 100%; min-height: 44px; }
+.planner-remove-event {
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid #c95b5b;
+    border-radius: 8px;
+    background: transparent;
+    color: #ff8b8b;
+    font-weight: 800;
+}
+.planner-owned-event { border-left-color: #4f9cff; }
+.planner-empty-day { color: var(--muted); text-align: center; }
+#today-date, #public-holiday, .calendar-public-holiday-marker { cursor: zoom-in; }
 
 .personal-calendar-detail-done {
     width: 100%;

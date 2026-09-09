@@ -16,6 +16,7 @@ const STORAGE_ADDED_SHIFTS = "heguiAddedShiftsV20";
 const STORAGE_SHOW_STARTUP_SPLASH = "heguiShowStartupSplash";
 const STORAGE_PERSONAL_CALENDAR = "heguiPersonalCalendar";
 const STORAGE_PERSONAL_CALENDAR_CACHE = "heguiPersonalCalendarCacheV27";
+const STORAGE_PLANNER_EVENTS = "heguiPlannerEventsV1";
 const STORAGE_DISPLAY_THEME = "heguiDisplayTheme";
 const STORAGE_UNLOCKED_FINAL_SHIFTS = "heguiUnlockedFinalShiftsAlphaV27";
 const STORAGE_WEEK_PANEL_HIDDEN = "heguiWeekPanelHidden";
@@ -176,6 +177,11 @@ const availabilityClearDayButton = document.querySelector("#availability-clear-d
 
 const resetRosterButton =
     document.querySelector("#reset-roster");
+
+todayDate?.addEventListener("click", () => openPersonalCalendarDetail(selectedDate));
+todayDate?.setAttribute("title", "Open day planner");
+publicHoliday?.addEventListener("click", () => openPersonalCalendarDetail(selectedDate));
+publicHoliday?.setAttribute("title", "Open day planner and public holiday details");
 
 
 function updateAppHeartButton() {
@@ -576,11 +582,46 @@ function personalEventOccursOnDate(event, date) {
     return true;
 }
 
+function loadPlannerEvents() {
+    try {
+        const events = JSON.parse(localStorage.getItem(STORAGE_PLANNER_EVENTS)) || [];
+        return Array.isArray(events) ? events : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function savePlannerEvents(events) {
+    localStorage.setItem(STORAGE_PLANNER_EVENTS, JSON.stringify(events));
+}
+
+function getPlannerEvents(date) {
+    const key = dateKey(date);
+    return loadPlannerEvents()
+        .filter((event) => event.date === key)
+        .map((event) => ({
+            ...event,
+            summary: event.summary || "Planner event",
+            start: event.allDay
+                ? { date: event.date, allDay: true }
+                : { iso: `${event.date}T${String(event.hour).padStart(2, "0")}:00:00`, allDay: false },
+            end: event.allDay
+                ? { date: event.date, allDay: true }
+                : { iso: `${event.date}T${String((Number(event.hour) + 1) % 24).padStart(2, "0")}:00:00`, allDay: false },
+            plannerEvent: true
+        }));
+}
+
 function getPersonalCalendarEvents(date) {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
-    if (!saved.enabled) return [];
-    return personalCalendarEvents.filter((event) => personalEventOccursOnDate(event, date));
+    const imported = saved.enabled
+        ? personalCalendarEvents.filter((event) => personalEventOccursOnDate(event, date))
+        : [];
+    return [...getPlannerEvents(date), ...imported].sort((a, b) => {
+        if (a.start?.allDay !== b.start?.allDay) return a.start?.allDay ? -1 : 1;
+        return String(a.start?.iso || "").localeCompare(String(b.start?.iso || ""));
+    });
 }
 
 function personalCalendarEventTime(event) {
@@ -601,45 +642,105 @@ function closePersonalCalendarDetail() {
     document.querySelector(".personal-calendar-detail-overlay")?.remove();
 }
 
-function openPersonalCalendarDetail(date, events = getPersonalCalendarEvents(date)) {
-    if (!events.length) return;
-    closePersonalCalendarDetail();
+function plannerHolidayLines(date) {
+    const act = showActPublicHolidays ? getActPublicHoliday(date) : "";
+    const nsw = showNswPublicHolidays ? getNswPublicHoliday(date) : "";
+    return [
+        act ? `ACT Public Holiday - ${act}` : "",
+        nsw && nsw !== act ? `NSW Public Holiday - ${nsw}` : ""
+    ].filter(Boolean);
+}
 
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
+function openPersonalCalendarDetail(date, events = getPersonalCalendarEvents(date)) {
+    closePersonalCalendarDetail();
+    const holidays = plannerHolidayLines(date);
     const overlay = document.createElement("div");
     overlay.className = "personal-calendar-detail-overlay";
     overlay.innerHTML = `
         <section class="personal-calendar-detail-panel" role="dialog" aria-modal="true" aria-labelledby="personal-calendar-detail-title">
             <div class="personal-calendar-detail-head">
                 <div>
-                    <span class="personal-calendar-detail-label">${escapeHtml(saved.name || "Personal Calendar")}</span>
+                    <span class="personal-calendar-detail-label">Day planner</span>
                     <h2 id="personal-calendar-detail-title">${escapeHtml(date.toLocaleDateString("en-AU", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric"
+                        weekday: "long", day: "numeric", month: "long", year: "numeric"
                     }))}</h2>
                 </div>
-                <button type="button" class="personal-calendar-detail-close" aria-label="Close calendar details">&times;</button>
+                <div class="personal-calendar-detail-actions">
+                    <button type="button" class="secondary-button planner-add-event">+ Add</button>
+                    <button type="button" class="personal-calendar-detail-close" aria-label="Close calendar details">&times;</button>
+                </div>
             </div>
+            ${holidays.length ? `<div class="planner-holidays"><strong>Public holiday</strong>${holidays.map((name) => `<span>${escapeHtml(name)}</span>`).join("")}</div>` : ""}
+            <form class="planner-event-form hidden">
+                <label>Description<input class="planner-event-description" maxlength="120" required placeholder="e.g. Pay rego"></label>
+                <div class="planner-form-row">
+                    <label>Time<select class="planner-event-hour">
+                        <option value="all-day">All day</option>
+                        ${Array.from({ length: 24 }, (_, hour) => `<option value="${hour}"${hour === 9 ? " selected" : ""}>${new Date(2000, 0, 1, hour).toLocaleTimeString("en-AU", { hour: "numeric" })}</option>`).join("")}
+                    </select></label>
+                    <label>Reminder<select class="planner-event-reminder">
+                        <option value="none">None</option>
+                        <option value="day">Day before</option>
+                        <option value="two_hours">2 hours before</option>
+                    </select></label>
+                </div>
+                <div class="planner-form-buttons">
+                    <button type="button" class="secondary-button planner-cancel-event">Cancel</button>
+                    <button type="submit" class="primary-button">Save event</button>
+                </div>
+            </form>
             <div class="personal-calendar-detail-list">
-                ${events.map((event) => `
-                    <article class="personal-calendar-detail-event">
-                        <h3>${escapeHtml(event.summary || "Calendar event")}</h3>
+                ${events.length ? events.map((event) => `
+                    <article class="personal-calendar-detail-event${event.plannerEvent ? " planner-owned-event" : ""}">
+                        <div class="planner-event-heading">
+                            <h3>${escapeHtml(event.summary || "Calendar event")}</h3>
+                            ${event.plannerEvent ? `<button type="button" class="planner-remove-event" data-event-id="${escapeHtml(event.id)}">Remove</button>` : ""}
+                        </div>
                         ${personalCalendarEventTime(event) ? `<p class="personal-calendar-detail-time">${escapeHtml(personalCalendarEventTime(event))}</p>` : ""}
                         ${event.location ? `<p><strong>Location:</strong> ${escapeHtml(event.location)}</p>` : ""}
                         ${event.description ? `<p class="personal-calendar-detail-description">${escapeHtml(event.description)}</p>` : ""}
                     </article>
-                `).join("")}
+                `).join("") : '<p class="planner-empty-day">Nothing planned yet.</p>'}
             </div>
             <button type="button" class="primary-button personal-calendar-detail-done">Close</button>
         </section>
     `;
 
+    const form = overlay.querySelector(".planner-event-form");
+    overlay.querySelector(".planner-add-event")?.addEventListener("click", () => {
+        form?.classList.remove("hidden");
+        overlay.querySelector(".planner-event-description")?.focus();
+    });
+    overlay.querySelector(".planner-cancel-event")?.addEventListener("click", () => form?.classList.add("hidden"));
+    form?.addEventListener("submit", (submitEvent) => {
+        submitEvent.preventDefault();
+        const summary = overlay.querySelector(".planner-event-description")?.value.trim();
+        if (!summary) return;
+        const hourValue = overlay.querySelector(".planner-event-hour")?.value || "all-day";
+        const stored = loadPlannerEvents();
+        stored.push({
+            id: `planner-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            date: dateKey(date), summary,
+            allDay: hourValue === "all-day",
+            hour: hourValue === "all-day" ? null : Number(hourValue),
+            reminder: overlay.querySelector(".planner-event-reminder")?.value || "none"
+        });
+        savePlannerEvents(stored);
+        openPersonalCalendarDetail(date);
+        if (setup && rosters.length) renderHome();
+        if (!rosterCalendarPage?.classList.contains("hidden")) renderRosterCalendar();
+    });
     overlay.addEventListener("click", (event) => {
         if (event.target === overlay || event.target.closest(".personal-calendar-detail-close, .personal-calendar-detail-done")) {
             closePersonalCalendarDetail();
+            return;
+        }
+        const removeButton = event.target.closest(".planner-remove-event");
+        if (removeButton) {
+            savePlannerEvents(loadPlannerEvents().filter((item) => item.id !== removeButton.dataset.eventId));
+            openPersonalCalendarDetail(date);
+            if (setup && rosters.length) renderHome();
+            if (!rosterCalendarPage?.classList.contains("hidden")) renderRosterCalendar();
         }
     });
     document.body.appendChild(overlay);
@@ -2341,20 +2442,20 @@ function renderRosterCalendar() {
             const marker = document.createElement("span");
             marker.className = `calendar-public-holiday-marker${calendarNswPublicHoliday ? " nsw-holiday-text" : ""}`;
             marker.textContent = calendarNswPublicHoliday && !calendarActPublicHoliday ? "NSW PH" : "PH";
-            marker.title = [calendarActPublicHoliday, calendarNswPublicHoliday && calendarNswPublicHoliday !== calendarActPublicHoliday ? `NSW: ${calendarNswPublicHoliday}` : ""].filter(Boolean).join(" | ");
+            marker.title = "Tap to see: " + [calendarActPublicHoliday, calendarNswPublicHoliday && calendarNswPublicHoliday !== calendarActPublicHoliday ? `NSW: ${calendarNswPublicHoliday}` : ""].filter(Boolean).join(" | ");
+            marker.addEventListener("click", (clickEvent) => {
+                clickEvent.stopPropagation();
+                openPersonalCalendarDetail(date);
+            });
             button.appendChild(marker);
         }
         const personalEvents = getPersonalCalendarEvents(date);
         if (personalEvents.length) {
             const event = document.createElement("span");
-            event.className = "calendar-personal-event";
-            event.textContent = personalEvents[0].summary || "Calendar";
-            event.title = "Tap to enlarge calendar details";
-            event.setAttribute("aria-label", `Open calendar details for ${formatAustralianDate(date)}`);
-            event.appendChild(Object.assign(document.createElement("span"), {
-                className: "personal-calendar-enlarge-cue",
-                innerHTML: "&#x2922;"
-            }));
+            event.className = `calendar-personal-event${personalEvents.length > 1 ? " multiple" : ""}`;
+            event.textContent = personalEvents.length > 1 ? String(personalEvents.length) : "";
+            event.title = `${personalEvents.length} planned event${personalEvents.length === 1 ? "" : "s"} - tap to enlarge`;
+            event.setAttribute("aria-label", `Open ${personalEvents.length} planner event${personalEvents.length === 1 ? "" : "s"} for ${formatAustralianDate(date)}`);
             event.addEventListener("click", (clickEvent) => {
                 clickEvent.stopPropagation();
                 openPersonalCalendarDetail(date, personalEvents);
