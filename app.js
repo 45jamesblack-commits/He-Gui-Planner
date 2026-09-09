@@ -2452,9 +2452,13 @@ function renderRosterCalendar() {
         const personalEvents = getPersonalCalendarEvents(date);
         if (personalEvents.length) {
             const event = document.createElement("span");
-            event.className = `calendar-personal-event${personalEvents.length > 1 ? " multiple" : ""}`;
-            event.textContent = personalEvents.length > 1 ? String(personalEvents.length) : "";
-            event.title = `${personalEvents.length} planned event${personalEvents.length === 1 ? "" : "s"} - tap to enlarge`;
+            event.className = `calendar-personal-event${personalEvents.length > 1 ? " multiple" : " single"}`;
+            event.textContent = personalEvents.length > 1
+                ? String(personalEvents.length)
+                : String(personalEvents[0]?.summary || "Planner event");
+            event.title = personalEvents.length === 1
+                ? `${personalEvents[0]?.summary || "Planner event"} - tap to enlarge`
+                : `${personalEvents.length} planned events - tap to enlarge`;
             event.setAttribute("aria-label", `Open ${personalEvents.length} planner event${personalEvents.length === 1 ? "" : "s"} for ${formatAustralianDate(date)}`);
             event.addEventListener("click", (clickEvent) => {
                 clickEvent.stopPropagation();

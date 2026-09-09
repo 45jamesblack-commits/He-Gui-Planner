@@ -1267,8 +1267,21 @@ body {
 }
 .calendar-personal-event {
     display: block;
-    width: 9px;
-    height: 9px;
+    max-width: 100%;
+    margin: 3px 1px 0;
+    overflow: hidden;
+    color: #78b7ff;
+    font-size: .68rem;
+    font-weight: 800;
+    line-height: 1.15;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: zoom-in;
+}
+.calendar-personal-event.multiple {
+    width: 18px;
+    height: 18px;
     margin: 3px auto 0;
     border-radius: 50%;
     background: #4f9cff;
@@ -1277,11 +1290,6 @@ body {
     font-weight: 900;
     line-height: 18px;
     text-align: center;
-    cursor: zoom-in;
-}
-.calendar-personal-event.multiple {
-    width: 18px;
-    height: 18px;
 }
 
 .week-personal-events {
