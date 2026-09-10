@@ -1452,6 +1452,17 @@ body {
 }
 .planner-owned-event { border-left-color: #4f9cff; }
 .planner-empty-day { color: var(--muted); text-align: center; }
+
+.notifications-status {
+    margin: -8px 4px 14px;
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.35;
+}
+
+.notifications-status.enabled { color: #76d69a; }
+.notifications-status.warning { color: var(--amber-light); }
+.notifications-status.error { color: #ff8a8a; }
 #today-date, #public-holiday, .calendar-public-holiday-marker { cursor: zoom-in; }
 
 .personal-calendar-detail-done {
