@@ -1,5 +1,5 @@
 ﻿// He Gui Planner - Usage Logger
-const HEGUI_APP_VERSION = "29";
+const HEGUI_APP_VERSION = "30";
 const HEGUI_LOGGER_URL =
   "https://uxkwtmbdxtsynvblyazq.supabase.co";
 
