@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 47087)
-Total output lines: 4354
-
 "use strict";
 
 const STORAGE_DATA = "glacksRosterData";
@@ -1212,7 +1209,1696 @@ async function initialiseApp() {
             alert(
                 "Roster update installed.\n\n" +
                 "Your latest roster information is now ready. " +
-                "Your select…17087 tokens truncated…t;
+                "Your selected roster and starting number " +
+                "have not changed."
+            );
+        }, 100);
+    }
+}
+
+async function loadShiftCodes() {
+    try {
+        const response = await fetch(
+            `shift_codes.csv?v=${Date.now()}`,
+            { cache: "no-store" }
+        );
+
+        if (!response.ok) {
+            throw new Error("Shift-code file was not found.");
+        }
+
+        const rows = parseCsv(await response.text());
+        shiftCodes = rows.slice(1).map((row) => ({
+            code: row[0]?.trim() || "",
+            start: row[1]?.trim() || "",
+            finish: row[2]?.trim() || ""
+        })).filter((shift) => shift.code && shift.start && shift.finish);
+    } catch (error) {
+        console.error("Shift-code loading failed:", error);
+        shiftCodes = [];
+    }
+
+    fillCasualShiftList();
+}
+
+profileNameButton.addEventListener("click", renameActiveProfile);
+
+document
+    .querySelector("#check-setup")
+    .addEventListener("click", beginSetupCheck);
+
+document
+    .querySelector("#previous-day")
+    .addEventListener("click", () => changeSelectedDate(-1));
+
+document
+    .querySelector("#next-day")
+    .addEventListener("click", () => changeSelectedDate(1));
+
+document
+    .querySelector("#print-roster")
+    .addEventListener("click", printRosterGrid);
+
+
+function loadSavedInformation() {
+    try {
+        rosters =
+            JSON.parse(localStorage.getItem(STORAGE_DATA)) || [];
+
+        const savedProfiles = JSON.parse(
+            localStorage.getItem(STORAGE_PROFILES)
+        );
+
+        const legacySetup = JSON.parse(
+            localStorage.getItem(STORAGE_SETUP)
+        );
+
+        profiles = normaliseProfiles(savedProfiles, legacySetup);
+
+        const savedActiveProfile = Number(
+            localStorage.getItem(STORAGE_ACTIVE_PROFILE)
+        );
+
+        activeProfileIndex = Number.isInteger(savedActiveProfile)
+            && savedActiveProfile >= 0
+            && savedActiveProfile < profiles.length
+            ? savedActiveProfile
+            : 0;
+
+        setup = profiles[activeProfileIndex].setup;
+        saveProfiles();
+    } catch (error) {
+        rosters = [];
+        profiles = createDefaultProfiles();
+        activeProfileIndex = 0;
+        setup = profiles[0].setup;
+    }
+}
+
+function createDefaultProfiles() {
+    return DEFAULT_PROFILE_NAMES.map((name, index) => ({
+        id: `profile-${index + 1}`,
+        name,
+        setup: null
+    }));
+}
+
+function normaliseProfiles(savedProfiles, legacySetup) {
+    const defaults = createDefaultProfiles();
+
+    if (!Array.isArray(savedProfiles)) {
+        defaults[0].setup = legacySetup || null;
+        return defaults;
+    }
+
+    return defaults.map((profile, index) => {
+        const saved = savedProfiles[index];
+
+        if (!saved || typeof saved !== "object") {
+            return profile;
+        }
+
+        return {
+            id: profile.id,
+            name: cleanProfileName(saved.name) || profile.name,
+            setup: saved.setup || null
+        };
+    });
+}
+
+function cleanProfileName(value) {
+    return typeof value === "string"
+        ? value.trim().slice(0, 30)
+        : "";
+}
+
+function saveProfiles() {
+    localStorage.setItem(
+        STORAGE_PROFILES,
+        JSON.stringify(profiles)
+    );
+
+    localStorage.setItem(
+        STORAGE_ACTIVE_PROFILE,
+        String(activeProfileIndex)
+    );
+}
+
+function renderProfileNavigation() {
+    profileTabs.innerHTML = "";
+
+    profiles.forEach((profile, index) => {
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.className = "profile-tab";
+        button.textContent = profile.name;
+        button.title = profile.name;
+        button.setAttribute("role", "tab");
+        button.setAttribute(
+            "aria-selected",
+            index === activeProfileIndex ? "true" : "false"
+        );
+
+        if (index === activeProfileIndex) {
+            button.classList.add("active");
+        }
+
+        button.addEventListener("click", () => switchProfile(index));
+        profileTabs.appendChild(button);
+    });
+
+    const activeProfile = profiles[activeProfileIndex];
+    profileNameButton.textContent = activeProfile.name;
+    profileNameButton.title = `Rename ${activeProfile.name}`;
+}
+
+function switchProfile(index) {
+    if (index === activeProfileIndex) {
+        return;
+    }
+
+    activeProfileIndex = index;
+    setup = profiles[activeProfileIndex].setup;
+    selectedDate = startOfDay(new Date());
+
+    plannerType.value = setup?.type === "casual"
+        ? "casual"
+        : setup?.employmentType === "parttime"
+            ? "parttime"
+            : "fulltime";
+    rosterSelect.value = setup && setup.type !== "casual"
+        ? String(setup.rosterIndex)
+        : "";
+    rosterDayInput.value = setup && setup.type !== "casual"
+        ? String(setup.anchorPosition)
+        : "";
+    updateSetupFields();
+
+    saveProfiles();
+    renderProfileNavigation();
+    showActiveProfile();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renameActiveProfile() {
+    const currentProfile = profiles[activeProfileIndex];
+    const enteredName = prompt(
+        "Enter this profile's name",
+        currentProfile.name
+    );
+
+    if (enteredName === null) {
+        return;
+    }
+
+    const cleanedName = cleanProfileName(enteredName);
+
+    if (!cleanedName) {
+        alert("Enter a profile name.");
+        return;
+    }
+
+    currentProfile.name = cleanedName;
+    saveProfiles();
+    renderProfileNavigation();
+}
+
+function showActiveProfile() {
+    if (setup) {
+        showHomeScreen();
+        return;
+    }
+
+    homeScreen.classList.add("hidden");
+    setupScreen.classList.remove("hidden");
+    plannerType.value = "fulltime";
+    updateSetupFields();
+}
+
+function updateSetupFields() {
+    const casualSelected = plannerType.value === "casual";
+    permanentSetupFields.classList.toggle("hidden", casualSelected);
+}
+
+function showCsvLoader() {
+    const card = setupScreen.querySelector(".card");
+
+    const loader = document.createElement("div");
+    loader.id = "csv-loader";
+
+    loader.innerHTML = `
+        <label for="csv-file">Load roster CSV</label>
+
+        <input
+            id="csv-file"
+            type="file"
+            accept=".csv,text/csv"
+        >
+
+        <p class="instructions">
+            Select the verified test-rosters.csv file.
+            The roster information will be saved on this device.
+        </p>
+    `;
+
+    card.insertBefore(
+        loader,
+        document.querySelector("#roster-select").previousElementSibling
+    );
+
+    document
+        .querySelector("#csv-file")
+        .addEventListener("change", importCsv);
+}
+
+function importCsv(event) {
+    const file = event.target.files[0];
+
+    if (!file) {
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+        try {
+            const rows = parseCsv(reader.result);
+
+            rosters = convertRowsToRosters(rows);
+
+            if (rosters.length === 0) {
+                throw new Error("No rosters were found.");
+            }
+
+            localStorage.setItem(
+                STORAGE_DATA,
+                JSON.stringify(rosters)
+            );
+
+            document.querySelector("#csv-loader")?.remove();
+
+            fillRosterList();
+
+            alert(
+                `${rosters.length} rosters loaded successfully.`
+            );
+        } catch (error) {
+            alert(
+                `The CSV could not be loaded.\n\n${error.message}`
+            );
+        }
+    };
+
+    reader.readAsText(file);
+}
+
+function parseCsv(text) {
+    const cleanText = text.replace(/^\uFEFF/, "");
+    const rows = [];
+
+    let row = [];
+    let value = "";
+    let insideQuotes = false;
+
+    for (let index = 0; index < cleanText.length; index += 1) {
+        const character = cleanText[index];
+        const nextCharacter = cleanText[index + 1];
+
+        if (character === '"') {
+            if (insideQuotes && nextCharacter === '"') {
+                value += '"';
+                index += 1;
+            } else {
+                insideQuotes = !insideQuotes;
+            }
+
+            continue;
+        }
+
+        if (character === "," && !insideQuotes) {
+            row.push(value.trim());
+            value = "";
+            continue;
+        }
+
+        if (
+            (character === "\n" || character === "\r") &&
+            !insideQuotes
+        ) {
+            if (character === "\r" && nextCharacter === "\n") {
+                index += 1;
+            }
+
+            row.push(value.trim());
+
+            if (row.some(cell => cell !== "")) {
+                rows.push(row);
+            }
+
+            row = [];
+            value = "";
+            continue;
+        }
+
+        value += character;
+    }
+
+    row.push(value.trim());
+
+    if (row.some(cell => cell !== "")) {
+        rows.push(row);
+    }
+
+    return rows;
+}
+
+function convertRowsToRosters(rows) {
+    if (rows.length < 2) {
+        throw new Error("The CSV does not contain roster rows.");
+    }
+
+    const headings = rows[0];
+    const foundRosters = [];
+
+    for (
+        let startColumn = 0;
+        startColumn + 2 < headings.length;
+        startColumn += 3
+    ) {
+        const name = headings[startColumn + 1]?.trim();
+
+        if (!name) {
+            continue;
+        }
+
+        const shifts = [];
+
+        for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
+            const rosterNumber =
+                rows[rowIndex][startColumn]?.trim() || "";
+
+            const code =
+                rows[rowIndex][startColumn + 1]?.trim() || "";
+
+            const time =
+                rows[rowIndex][startColumn + 2]?.trim() || "";
+
+            if (!rosterNumber && !code && !time) {
+                continue;
+            }
+
+            if (!code) {
+                continue;
+            }
+
+            shifts.push({
+                number: Number(rosterNumber) || shifts.length + 1,
+                code,
+                time
+            });
+        }
+
+        if (shifts.length > 0) {
+            foundRosters.push({
+                name,
+                shifts
+            });
+        }
+    }
+
+    return foundRosters;
+}
+
+function fillRosterList() {
+    rosterSelect.disabled = false;
+    rosterSelect.innerHTML =
+        '<option value="">Choose your roster</option>';
+
+    rosters.forEach((roster, index) => {
+        const option = document.createElement("option");
+
+        option.value = String(index);
+        option.textContent =
+            `${roster.name} - ${roster.shifts.length} positions`;
+
+        rosterSelect.appendChild(option);
+    });
+}
+
+
+const ROSTER_HELPER_DAY_LABELS = ["TH1","FR1","SA1","SU1","MO1","TU1","WE1","TH2","FR2","SA2","SU2","MO2","TU2","WE2","TH3","FR3","SA3","SU3","MO3","TU3","WE3","TH4","FR4","SA4","SU4","MO4","TU4","WE4"];
+const ROSTER_HELPER_WEEKDAY = { SU:0, MO:1, TU:2, WE:3, TH:4, FR:5, SA:6 };
+
+function renderRosterDayHelper() {
+    if (!rosterHelperRows || !rosterHelperWeeks) return;
+    const roster = rosters[Number(rosterSelect.value)];
+    const maxRows = roster ? Math.min(15, Math.ceil(roster.shifts.length / 28)) : 15;
+
+    if (helperRosterRow && helperRosterRow > maxRows) helperRosterRow = null;
+    rosterHelperRows.innerHTML = "";
+    for (let row = 1; row <= 15; row++) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = row;
+        button.disabled = row > maxRows;
+        button.classList.toggle("selected", row === helperRosterRow);
+        button.addEventListener("click", () => {
+            helperRosterRow = row;
+            renderRosterDayHelper();
+            applyRosterDayHelperSelection();
+        });
+        rosterHelperRows.appendChild(button);
+    }
+
+    rosterHelperWeeks.innerHTML = "";
+    const todayWeekday = new Date().getDay();
+    for (let week = 1; week <= 4; week++) {
+        const wrap = document.createElement("div");
+        wrap.className = "roster-helper-week";
+        const name = document.createElement("div");
+        name.className = "roster-helper-week-name";
+        name.textContent = `Week ${week}`;
+        wrap.appendChild(name);
+        const days = document.createElement("div");
+        days.className = "roster-helper-week-days";
+        ROSTER_HELPER_DAY_LABELS.forEach((label, index) => {
+            if (!label.endsWith(String(week))) return;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = label.slice(0, 2);
+            button.title = label;
+            button.classList.toggle("selected", helperRosterColumn === index + 1);
+            button.classList.toggle("today-weekday", ROSTER_HELPER_WEEKDAY[label.slice(0,2)] === todayWeekday);
+            button.addEventListener("click", () => {
+                helperRosterColumn = index + 1;
+                renderRosterDayHelper();
+                applyRosterDayHelperSelection();
+            });
+            days.appendChild(button);
+        });
+        wrap.appendChild(days);
+        rosterHelperWeeks.appendChild(wrap);
+    }
+    applyRosterDayHelperSelection(false);
+}
+
+function applyRosterDayHelperSelection(updateInput = true) {
+    if (!helperRosterRow || !helperRosterColumn) {
+        rosterHelperResult.textContent = "Select a row and today's position.";
+        return;
+    }
+    const rosterDay = (helperRosterRow - 1) * 28 + helperRosterColumn;
+    const roster = rosters[Number(rosterSelect.value)];
+    const label = ROSTER_HELPER_DAY_LABELS[helperRosterColumn - 1];
+    if (roster && rosterDay > roster.shifts.length) {
+        rosterHelperResult.textContent = `That position is outside the selected roster.`;
+        return;
+    }
+    if (updateInput) rosterDayInput.value = rosterDay;
+    rosterHelperResult.textContent = `Row ${helperRosterRow} - ${label} -> roster day ${rosterDay}`;
+}
+
+function beginSetupCheck() {
+    if (plannerType.value === "casual") {
+        setup = { type: "casual" };
+        profiles[activeProfileIndex].setup = setup;
+        saveProfiles();
+        logHeguiEvent("roster_selected", {
+            action: "setup_saved",
+            details: {
+                employment_type: "casual",
+                profile_slot: activeProfileIndex + 1
+            }
+        });
+        selectedDate = startOfDay(new Date());
+        showHomeScreen();
+        return;
+    }
+
+    const rosterIndex = Number(rosterSelect.value);
+    const roster = rosters[rosterIndex];
+    const anchorPosition = Number(rosterDayInput.value);
+
+    if (!roster) {
+        alert("Please select your roster.");
+        return;
+    }
+
+    if (
+        !Number.isInteger(anchorPosition) ||
+        anchorPosition < 1 ||
+        anchorPosition > roster.shifts.length
+    ) {
+        alert(
+            `Enter a roster number between 1 and ${roster.shifts.length}.`
+        );
+        return;
+    }
+
+    const anchorDate = startOfDay(new Date());
+
+    // Part-time hours are derived from the selected roster cycle;
+    // the user does not need to type or validate them during setup.
+    const derivedFortnightMinutes = plannerType.value === "parttime"
+        ? calculateRosterCycleFortnightMinutes({ type: "roster", rosterIndex })
+        : 76 * 60;
+    const weeklyHours = derivedFortnightMinutes > 0
+        ? derivedFortnightMinutes / 120
+        : 38;
+
+    const proposedSetup = {
+        type: "roster",
+        employmentType: plannerType.value,
+        contractedWeeklyHours: weeklyHours,
+        rosterIndex,
+        anchorPosition,
+        anchorDate: dateKey(anchorDate)
+    };
+
+    setup = proposedSetup;
+    profiles[activeProfileIndex].setup = setup;
+    saveProfiles();
+logHeguiEvent("roster_selected", {
+  roster: roster.name,
+  action: "setup_saved",
+  details: {
+    roster_index: rosterIndex,
+    anchor_position: anchorPosition,
+    employment_type: plannerType.value,
+    profile_slot: activeProfileIndex + 1
+  }
+});
+    selectedDate = anchorDate;
+
+    showHomeScreen();
+}
+
+function showHomeScreen() {
+    setupScreen.classList.add("hidden");
+    homeScreen.classList.remove("hidden");
+
+    renderHome();
+}
+
+function renderHome() {
+    if (setup?.type === "casual") {
+        renderCasualHome();
+        return;
+    }
+
+    editedDot.classList.add("hidden");
+    addEditShiftButton.classList.add("hidden");
+    editShiftsListButton.classList.add("hidden");
+    deleteShiftButton.classList.add("hidden");
+    printRosterButton.classList.remove("hidden");
+    rosterActionButtons.classList.remove("hidden");
+
+    const result = getShiftForDate(selectedDate);
+    const change = getPermanentChange(selectedDate);
+    const roster = rosters[setup.rosterIndex];
+    const today = startOfDay(new Date());
+    const differenceFromToday = dayDifference(today, selectedDate);
+
+    if (differenceFromToday === 0) {
+        todayLabel.textContent = "Today";
+    } else if (differenceFromToday === 1) {
+        todayLabel.textContent = "Tomorrow";
+    } else if (differenceFromToday === -1) {
+        todayLabel.textContent = "Yesterday";
+    } else {
+        todayLabel.textContent = "Selected date";
+    }
+
+    todayDate.textContent =
+    selectedDate.toLocaleDateString("en-AU", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+    });
+
+    const actHolidayName = showActPublicHolidays ? getActPublicHoliday(selectedDate) : "";
+    const nswHolidayName = showNswPublicHolidays ? getNswPublicHoliday(selectedDate) : "";
+    const holidayLines = [];
+    if (actHolidayName) holidayLines.push(`ACT Public Holiday - ${actHolidayName}`);
+    if (nswHolidayName && nswHolidayName !== actHolidayName) holidayLines.push(`NSW Public Holiday - ${nswHolidayName}`);
+    publicHoliday.textContent = holidayLines.join(" | ");
+    publicHoliday.classList.toggle("hidden", holidayLines.length === 0);
+    publicHoliday.classList.toggle("nsw-holiday-text", !actHolidayName && Boolean(nswHolidayName));
+
+    // The large card is the immutable base roster reference. Changes are shown
+    // in the week/calendar and fortnight summary, never substituted into this card.
+    shiftCard?.classList.remove("hidden");
+    shiftCode.textContent = friendlyCode(result.shift.code);
+    shiftTime.textContent = friendlyTime(result.shift);
+    rosterName.textContent = roster.name;
+    rosterPosition.textContent = `Roster number ${result.position} of ${roster.shifts.length}`;
+    rosterPosition.classList.add("roster-position-corner");
+    const dayModified = Boolean(change) || getAddedShifts(selectedDate).length > 0;
+    editedDot.classList.toggle("hidden", !dayModified);
+    editedDot.title = dayModified ? "This roster day has a change or added shift" : "";
+    renderPayPeriodSummary();
+
+    renderWeek();
+}
+
+function renderCasualHome() {
+    rosterActionButtons.classList.remove("hidden");
+    shiftCard?.classList.add("hidden");
+    setSelectedDateHeading();
+    renderHoliday(selectedDate);
+    editedDot.classList.add("hidden");
+    addEditShiftButton.classList.add("hidden");
+    editShiftsListButton.classList.add("hidden");
+    deleteShiftButton.classList.add("hidden");
+    printRosterButton.classList.add("hidden");
+    renderPayPeriodSummary();
+    renderWeek();
+}
+
+function setSelectedDateHeading() {
+    const today = startOfDay(new Date());
+    const difference = dayDifference(today, selectedDate);
+
+    todayLabel.textContent = difference === 0
+        ? "Today"
+        : difference === 1
+            ? "Tomorrow"
+            : difference === -1
+                ? "Yesterday"
+                : "Selected date";
+
+    todayDate.textContent = selectedDate.toLocaleDateString("en-AU", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+    });
+}
+
+function renderHoliday(date) {
+    const actHolidayName = showActPublicHolidays ? getActPublicHoliday(date) : "";
+    const nswHolidayName = showNswPublicHolidays ? getNswPublicHoliday(date) : "";
+    const holidayLines = [];
+    if (actHolidayName) holidayLines.push(`ACT Public Holiday - ${actHolidayName}`);
+    if (nswHolidayName && nswHolidayName !== actHolidayName) holidayLines.push(`NSW Public Holiday - ${nswHolidayName}`);
+    publicHoliday.textContent = holidayLines.join(" | ");
+    publicHoliday.classList.toggle("hidden", holidayLines.length === 0);
+    publicHoliday.classList.toggle("nsw-holiday-text", !actHolidayName && Boolean(nswHolidayName));
+}
+
+function setWeekPanelHidden(hidden, persist = true) {
+    if (!weekSection || !showWeekButton) return;
+    weekSection.classList.toggle("week-section-hidden", hidden);
+    showWeekButton.classList.toggle("hidden", !hidden);
+    if (hideWeekButton) hideWeekButton.setAttribute("aria-expanded", String(!hidden));
+    if (persist) localStorage.setItem(STORAGE_WEEK_PANEL_HIDDEN, hidden ? "1" : "0");
+}
+
+if (hideWeekButton) {
+    const hideWeek = (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        setWeekPanelHidden(true);
+    };
+    hideWeekButton.addEventListener("click", hideWeek);
+    hideWeekButton.addEventListener("touchend", hideWeek, { passive: false });
+}
+
+if (showWeekButton) {
+    const showWeek = (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        setWeekPanelHidden(false);
+    };
+    showWeekButton.addEventListener("click", showWeek);
+    showWeekButton.addEventListener("touchend", showWeek, { passive: false });
+}
+
+setWeekPanelHidden(localStorage.getItem(STORAGE_WEEK_PANEL_HIDDEN) === "1", false);
+
+function renderWeek() {
+    weekList.innerHTML = "";
+    const today = startOfDay(new Date());
+
+    for (let offset = 0; offset < 7; offset += 1) {
+        const date = addDays(selectedDate, offset);
+        const result = setup?.type === "casual" ? null : getShiftForDate(date);
+        const permanentChange = setup?.type === "casual" ? null : getPermanentChange(date);
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "week-day";
+
+        const differenceFromToday = dayDifference(today, date);
+        let label;
+        if (differenceFromToday === 0) label = "Today";
+        else if (differenceFromToday === 1) label = "Tomorrow";
+        else if (date <= endOfCurrentWeek(today)) label = date.toLocaleDateString("en-AU", { weekday: "long" });
+        else label = date.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+
+        const actHolidayName = showActPublicHolidays ? getActPublicHoliday(date) : "";
+        const nswHolidayName = showNswPublicHolidays ? getNswPublicHoliday(date) : "";
+        const holidayMarkup = [
+            actHolidayName ? `<span class="week-day-holiday">${escapeHtml(actHolidayName)}</span>` : "",
+            nswHolidayName && nswHolidayName !== actHolidayName ? `<span class="week-day-holiday nsw-holiday-text">NSW - ${escapeHtml(nswHolidayName)}</span>` : ""
+        ].filter(Boolean).join("");
+        const actSchoolHolidayName = showActSchoolHolidays ? getActSchoolHoliday(date) : "";
+        const nswSchoolHolidayName = showNswSchoolHolidays ? getNswSchoolHoliday(date) : "";
+        // One school-holiday icon only in the 7-day view. NSW wins the icon when both apply.
+        const schoolHolidayIconMarkup = nswSchoolHolidayName
+            ? `<img class="school-holiday-icon" src="nsw-school-holidays-icon.svg" alt="" aria-hidden="true">`
+            : actSchoolHolidayName
+                ? `<img class="school-holiday-icon" src="school-holidays-icon.png" alt="" aria-hidden="true">`
+                : "";
+        const schoolHolidayMarkup = nswSchoolHolidayName
+            ? `<span class="week-day-school-holiday nsw-holiday-text">${escapeHtml(nswSchoolHolidayName)}</span>`
+            : actSchoolHolidayName
+                ? `<span class="week-day-school-holiday">${escapeHtml(actSchoolHolidayName)}</span>`
+                : "";
+
+        const shiftItems = [];
+        if (setup?.type === "casual") {
+            getCasualShifts(date).forEach((entry) => {
+                shiftItems.push({
+                    text: `${entry.code} ${formatClockTime(entry.start)} - ${formatClockTime(entry.finish)}`,
+                    added: true,
+                    edited: Boolean(entry.timesEdited)
+                });
+            });
+        } else {
+            if (permanentChange?.type === "swap_worked" && (permanentChange.sameDay || permanentChange.preserveOriginal)) {
+                shiftItems.push({ text: displayShift(result.shift), original: true, strike: Boolean(permanentChange.sameDay) });
+                shiftItems.push({ text: displayShift(permanentDisplayShift(permanentChange, result.shift)), added: true });
+            } else if (permanentChange?.type === "swap_off") {
+                shiftItems.push({ text: displayShift(result.shift), original: true, strike: true });
+                shiftItems.push({ text: displayShift(permanentDisplayShift(permanentChange, result.shift)), added: true });
+            } else {
+                shiftItems.push({
+                    text: permanentChange ? displayShift(permanentDisplayShift(permanentChange, result.shift)) : displayShift(result.shift),
+                    added: Boolean(permanentChange)
+                });
+            }
+            getAddedShifts(date).forEach((entry) => {
+                shiftItems.push({ text: `${entry.code} ${formatClockTime(entry.start)} - ${formatClockTime(entry.finish)}`, added: true });
+            });
+        }
+
+        const hasOverflow = shiftItems.length > 3;
+        const visibleShiftItems = shiftItems.slice(0, 3);
+        const shiftMarkup = visibleShiftItems.length
+            ? visibleShiftItems.map((item) => {
+                const classes = [item.added ? "week-shift-added" : "week-shift-original"];
+                if (item.strike) classes.push("swap-original");
+                return `<span class="${classes.join(" ")}">${escapeHtml(item.text)}</span>`;
+            }).join("")
+            : "No shift";
+
+        if (permanentChange || visibleShiftItems.some((item) => item.edited)) row.classList.add("edited-shift");
+        if (hasOverflow) row.classList.add("week-shift-overflow");
+
+        const personalEvents = getPersonalCalendarEvents(date);
+        const personalEventMarkup = personalEvents.length
+            ? `<span class="week-personal-events" title="Tap to enlarge calendar details" aria-label="Open calendar details for ${escapeHtml(formatAustralianDate(date))}">${personalEvents.slice(0, 2).map((event) => `<span>${escapeHtml(event.summary || "Calendar event")}</span>`).join("")}${personalEvents.length > 2 ? `<span>+${personalEvents.length - 2} more</span>` : ""}<span class="personal-calendar-enlarge-cue" aria-hidden="true">&#x2922;</span></span>`
+            : "";
+
+        row.innerHTML = `
+            ${hasOverflow ? '<span class="week-overflow-dot" title="More shifts - check Monthly View" aria-label="More shifts - check Monthly View"></span>' : ""}
+            <span class="week-day-date">
+                <span class="school-holiday-icon-slot">${schoolHolidayIconMarkup}</span>
+                <span class="week-day-date-copy">
+                    <span>${escapeHtml(label)}</span>
+                    ${holidayMarkup}
+                    ${schoolHolidayMarkup}
+                </span>
+            </span>
+            <span class="week-day-shift">${shiftMarkup}${personalEventMarkup}</span>
+        `;
+
+        row.addEventListener("click", (event) => {
+            if (personalEvents.length && event.target.closest(".week-personal-events")) {
+                openPersonalCalendarDetail(date, personalEvents);
+                return;
+            }
+            selectedDate = date;
+            renderHome();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+        weekList.appendChild(row);
+    }
+}
+
+function changeSelectedDate(numberOfDays) {
+    selectedDate = addDays(selectedDate, numberOfDays);
+    renderHome();
+}
+
+function lookUpDate() {
+    openRosterCalendar("lookup");
+}
+
+function fillCasualShiftList() {
+    casualShiftCode.innerHTML = '<option value="">Choose a shift</option>';
+    permanentShiftCode.innerHTML = '<option value="">Choose a shift</option><option value="spare">Spare / No specific vacancy</option>';
+
+    shiftCodes.forEach((shift, index) => {
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = `${shift.code} - ${shift.start}-${shift.finish}`;
+        casualShiftCode.appendChild(option);
+        permanentShiftCode.appendChild(option.cloneNode(true));
+    });
+}
+
+function loadPermanentChanges() {
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_PERMANENT_CHANGES)) || {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function getPermanentChange(date) {
+    const profileId = profiles[activeProfileIndex]?.id;
+    return loadPermanentChanges()[profileId]?.[dateKey(date)] || null;
+}
+
+function loadAddedShifts() {
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_ADDED_SHIFTS)) || {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function getAddedShifts(date) {
+    const profileId = profiles[activeProfileIndex]?.id;
+    const value = loadAddedShifts()[profileId]?.[dateKey(date)];
+    return Array.isArray(value) ? value : value ? [value] : [];
+}
+
+function addAddedShift(entry) {
+    const all = loadAddedShifts();
+    const profileId = profiles[activeProfileIndex].id;
+    const profile = all[profileId] || {};
+    const list = Array.isArray(profile[entry.date]) ? profile[entry.date] : profile[entry.date] ? [profile[entry.date]] : [];
+    list.push(entry);
+    profile[entry.date] = list;
+    all[profileId] = profile;
+    localStorage.setItem(STORAGE_ADDED_SHIFTS, JSON.stringify(all));
+}
+
+function deleteAddedShiftById(id) {
+    const all = loadAddedShifts();
+    const profileId = profiles[activeProfileIndex].id;
+    const profile = all[profileId] || {};
+    Object.keys(profile).forEach((key) => {
+        const list = (Array.isArray(profile[key]) ? profile[key] : [profile[key]]).filter((entry) => entry?.id !== id);
+        if (list.length) profile[key] = list;
+        else delete profile[key];
+    });
+    all[profileId] = profile;
+    localStorage.setItem(STORAGE_ADDED_SHIFTS, JSON.stringify(all));
+    if (setup?.employmentType === "parttime") renderPayPeriodSummary();
+}
+
+function openDeleteRecordPage(kind) {
+    if (!setup) return;
+    if (setup.type === "casual" && !["casual_shift", "finalised_shift"].includes(kind)) return;
+    const profileId = profiles[activeProfileIndex]?.id;
+    deleteRecordList.innerHTML = "";
+    let items = [];
+
+    if (kind === "casual_shift") {
+        const profile = loadAllCasualShifts()[profileId] || {};
+        items = Object.values(profile).flatMap(normaliseCasualDay).filter((entry) => !isEntryFinalised("casual", entry)).map((entry) => ({
+            id: entry.id,
+            sortDate: entry.date,
+            label: `${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}`,
+            autoAdjustedStart: Boolean(entry.autoAdjustedStart),
+            autoAdjustedFinish: Boolean(entry.autoAdjustedFinish),
+            countdown: finalisationCountdown(entry.date),
+            edit: () => {
+                selectedDate = parseDateKey(entry.date);
+                deleteRecordPage.classList.add("hidden");
+                openCasualShiftEditor(entry);
+            }
+        }));
+        deleteRecordTitle.textContent = "Edit Shifts";
+    } else if (kind === "added_shift") {
+        const profile = loadAddedShifts()[profileId] || {};
+        items = Object.values(profile).flat().filter((entry) => !isEntryFinalised("added", entry)).map((entry) => ({
+            id: entry.id,
+            sortDate: entry.date,
+            label: `${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}${entry.payClass === "overtime" ? " - Overtime" : " - Extra hours"}`,
+            autoAdjustedStart: Boolean(entry.autoAdjustedStart),
+            autoAdjustedFinish: Boolean(entry.autoAdjustedFinish),
+            countdown: finalisationCountdown(entry.date),
+            edit: () => {
+                deleteRecordPage.classList.add("hidden");
+                openAddedShiftEditor(entry);
+            }
+        }));
+        deleteRecordTitle.textContent = "Edit Added Shifts";
+    } else if (kind === "delete_added_shift") {
+        const profile = loadAddedShifts()[profileId] || {};
+        items = Object.values(profile).flat().map((entry) => ({
+            id: entry.id,
+            sortDate: entry.date,
+            label: `${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}${entry.payClass === "overtime" ? " - Overtime" : " - Extra hours"}`,
+            remove: () => deleteAddedShiftById(entry.id)
+        }));
+        deleteRecordTitle.textContent = "Delete Added Shift";
+    } else if (kind === "finalised_shift") {
+        const casualProfile = loadAllCasualShifts()[profileId] || {};
+        const addedProfile = loadAddedShifts()[profileId] || {};
+        const casualItems = Object.values(casualProfile).flatMap(normaliseCasualDay)
+            .filter((entry) => isEntryFinalised("casual", entry))
+            .map((entry) => ({
+                id: `casual-${entry.id}`,
+                sortDate: entry.date,
+                label: `FINAL - ${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}`,
+                unlock: () => unlockFinalisedEntry("casual", entry)
+            }));
+        const addedItems = Object.values(addedProfile).flat()
+            .filter((entry) => isEntryFinalised("added", entry))
+            .map((entry) => ({
+                id: `added-${entry.id}`,
+                sortDate: entry.date,
+                label: `FINAL - ${formatAustralianDate(parseDateKey(entry.date))} - ${entry.code} ${entry.start}-${entry.finish}${entry.payClass === "overtime" ? " - Overtime" : " - Extra hours"}`,
+                unlock: () => unlockFinalisedEntry("added", entry)
+            }));
+        items = [...casualItems, ...addedItems];
+        deleteRecordTitle.textContent = "Alpha - Unlock Finalised Shift";
+    } else {
+        const records = loadPermanentChanges()[profileId] || {};
+        const wanted = kind === "swap"
+            ? new Set(["swap_worked", "swap_off"])
+            : new Set(["roster_change_worked", "roster_change_off"]);
+        const groups = {};
+        Object.values(records).filter((entry) => wanted.has(entry?.type)).forEach((entry) => {
+            groups[entry.id] ||= [];
+            groups[entry.id].push(entry);
+        });
+        items = Object.entries(groups)
+            .filter(([, entries]) => entries.some((entry) => !isShiftFinalised(entry.date)))
+            .map(([id, entries]) => {
+            const ordered = [...entries].sort((a,b) => a.date.localeCompare(b.date));
+            const codes = ordered.map((e) => `${formatAustralianDate(parseDateKey(e.date))} ${e.originalCode && e.sameDay ? `${e.originalCode}->` : ""}${e.code || ""}`).join(" / ");
+            return {
+                id,
+                sortDate: ordered[0]?.date || "",
+                countdown: finalisationCountdown(ordered[0]?.date),
+                label: `${kind === "swap" ? (entries[0]?.swapType === "colleague" ? "Colleague Swap" : "Individual Swap") : "Management Change"} - ${codes}`,
+                remove: () => deletePermanentLinkedRecord(id)
+            };
+        });
+        deleteRecordTitle.textContent = kind === "swap" ? "Delete Swap" : "Delete Management Change";
+    }
+
+    items.sort((a,b) => String(a.sortDate || a.label).localeCompare(String(b.sortDate || b.label)));
+    if (!items.length) {
+        deleteRecordPage.classList.add("hidden");
+        changeActionPage.classList.add("hidden");
+        renderHome();
+        return;
+    }
+
+    items.forEach((item, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary-button full-width delete-record-item";
+        if (index === 0 && ["added_shift", "casual_shift"].includes(kind)) button.classList.add("oldest-shift-item");
+        const showCountdown = index === 0 && ["added_shift", "casual_shift", "swap", "management"].includes(kind) && item.countdown;
+        const leftAmber = item.autoAdjustedStart ? `<span class="amber-dot edit-list-amber" title="Start time was automatically adjusted"></span>` : "";
+        const rightAmber = item.autoAdjustedFinish ? `<span class="amber-dot edit-list-amber" title="Finish time was automatically adjusted"></span>` : "";
+        button.innerHTML = `<span class="record-item-label">${leftAmber}${escapeHtml(item.label)}${rightAmber}</span>${showCountdown ? `<span class="shift-lock-countdown">${escapeHtml(item.countdown)}</span>` : ""}`;
+        button.addEventListener("click", () => {
+            if (item.edit) {
+                item.edit();
+                return;
+            }
+            if (item.unlock) {
+                if (!confirm(`Unlock ${item.label}?`)) return;
+                item.unlock();
+                renderHome();
+                openDeleteRecordPage(kind);
+                return;
+            }
+            if (!confirm(`Delete ${item.label}?`)) return;
+            item.remove();
+            renderHome();
+            // Stay in the list only while there are more records to remove.
+            openDeleteRecordPage(kind);
+        });
+        deleteRecordList.appendChild(button);
+    });
+
+    changeActionPage.classList.add("hidden");
+    deleteRecordPage.classList.remove("hidden");
+}
+
+function deletePermanentLinkedRecord(id) {
+    const all = loadPermanentChanges();
+    const profileId = profiles[activeProfileIndex].id;
+    const records = all[profileId] || {};
+    Object.keys(records).forEach((key) => {
+        if (records[key]?.id === id) delete records[key];
+    });
+    all[profileId] = records;
+    localStorage.setItem(STORAGE_PERMANENT_CHANGES, JSON.stringify(all));
+}
+
+function permanentDisplayShift(change, original) {
+    if (change.type === "leave") return { code: change.leaveCode, time: original.time };
+    if (["swap_off", "roster_change_off"].includes(change.type)) return { code: change.code || "O", time: "Replacement day off" };
+    return { code: change.code || original.code, time: `${change.start}-${change.finish}` };
+}
+
+function changeLabel(type) {
+    return ({
+        add_shift: "Casual / Extra Hours",
+        leave: "Leave",
+        swap_worked: "Worked swap day",
+        swap_off: "Replacement day off",
+        roster_change_worked: "Management roster change",
+        roster_change_off: "Management moved day off"
+    })[type] || "Roster change";
+}
+
+let pendingChangeAction = null;
+let pendingLeaveType = "annual_leave";
+let pendingSwapType = "individual";
+let pendingCalendarDates = [];
+let editingPermanentDates = false;
+let permanentEditorSnapshot = null;
+
+function rosterHasAdo() {
+    if (!setup || setup.type === "casual") return false;
+    return Boolean(rosters[setup.rosterIndex]?.shifts?.some((shift) => String(shift.code).toUpperCase() === "A"));
+}
+
+function managementChangeAllowed() {
+    return setup?.type === "roster" && setup?.employmentType === "fulltime" && !rosterHasAdo();
+}
+
+function openChangeApplicationMenu() {
+    if (!setup) return;
+    const casual = setup.type === "casual";
+    chooseLeaveButton.classList.toggle("hidden", casual);
+    chooseIndividualSwapButton.classList.toggle("hidden", casual);
+    chooseColleagueSwapButton.classList.toggle("hidden", casual);
+    chooseManagementChangeButton.classList.toggle("hidden", casual);
+    document.querySelector("#remove-leave")?.classList.toggle("hidden", casual);
+    deleteSwapGlobalButton?.classList.toggle("hidden", casual);
+    deleteAddedShiftGlobalButton?.classList.toggle("hidden", casual);
+    deleteManagementGlobalButton?.classList.toggle("hidden", casual);
+    chooseEditShiftsButton.classList.remove("hidden");
+    chooseExtraHoursButton.textContent = casual ? "Add Casual Shift" : (setup.employmentType === "fulltime" ? "Add Overtime Shift" : "Add Extra Hours");
+    chooseManagementChangeButton.disabled = !managementChangeAllowed();
+    chooseManagementChangeButton.classList.toggle("action-locked", !managementChangeAllowed());
+    chooseManagementChangeButton.title = managementChangeAllowed() ? "" : "Management Change is only available to full-time staff on a No ADO roster.";
+    changeActionPage.classList.remove("hidden");
+}
+let rosterCalendarViewDate = startOfDay(new Date());
+
+function openRosterCalendar(action) {
+    if (!setup) return;
+    if (action === "roster_change" && !managementChangeAllowed()) {
+        alert("Management Roster Change is only available to full-time staff on a No ADO roster.");
+        return;
+    }
+    pendingChangeAction = action;
+    pendingCalendarDates = [];
+    rosterCalendarViewDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const config = {
+        remove_leave: [
+            "Deselect Leave",
+            "Tap the start and finish dates of the leave you want to remove. Any leave type inside that range will be deselected."
+        ],
+        leave: [
+            ({
+                annual_leave: "Annual Leave",
+                personal_leave: "Personal Leave",
+                long_service_leave: "Long Service Leave",
+                other_leave: "Other Leave"
+            })[pendingLeaveType] || "Leave",
+            "Tap any start date and finish date. The earlier date becomes Start and the later date becomes Finish. H\u00e9 Gu\u01d0 will apply leave only to rostered working days."
+        ],
+        swap: [
+            pendingSwapType === "colleague" ? "Colleague Swap" : "Individual Swap",
+            calendarSameDaySwap.checked
+                ? "Choose one working day. You will then choose a replacement shift with exactly the same paid hours."
+                : "Choose the two swap dates in either order. H\u00e9 Gu\u01d0 will identify the working and off days automatically. Swap hours must match and worked shifts must not overlap."
+        ],
+        add_shift: [setup.type === "casual" ? "Add Casual Shift" : (setup.employmentType === "fulltime" ? "Add Overtime Shift" : "Add Extra Hours"), "Choose one date."],
+        roster_change: ["Management Roster Change", "First tap the original working day. Then tap the original RDO. Management changes are only available on No ADO rosters."],
+        lookup: ["Choose Date", "Choose one date to view."],
+        month_view: ["Monthly View", "Select a date and press OK to move the 7-day roster to that date. Your current pay fortnight is highlighted in light blue."]
+    }[action];
+    rosterCalendarTitle.textContent = config[0];
+    rosterCalendarInstructions.textContent = config[1];
+    calendarSameDayOption.classList.toggle("hidden", action !== "swap");
+    if (action !== "swap") calendarSameDaySwap.checked = false;
+    rosterCalendarPage.classList.remove("hidden");
+    renderRosterCalendar();
+}
+
+function closeRosterCalendar() {
+    const action = pendingChangeAction;
+    rosterCalendarPage.classList.add("hidden");
+    if (editingPermanentDates) {
+        editingPermanentDates = false;
+        permanentEditorSnapshot = null;
+        permanentChangePage.classList.remove("hidden");
+        renderPermanentChangeDateSummary();
+        return;
+    }
+    pendingCalendarDates = [];
+    pendingChangeAction = null;
+    if (action === "leave") {
+        leaveTypePage.classList.remove("hidden");
+    } else if (action === "add_shift" && setup?.type === "casual") {
+        renderHome();
+    } else if (action === "month_view") {
+        renderHome();
+    } else if (["remove_leave", "swap", "add_shift", "roster_change"].includes(action)) {
+        changeActionPage.classList.remove("hidden");
+    }
+}
+
+function moveRosterCalendarMonth(offset) {
+    rosterCalendarViewDate = new Date(rosterCalendarViewDate.getFullYear(), rosterCalendarViewDate.getMonth() + offset, 1);
+    renderRosterCalendar();
+}
+
+function rosterCalendarCode(date) {
+    if (setup?.type === "casual") {
+        return getCasualShift(date)?.code || "";
+    }
+    const original = getShiftForDate(date).shift;
+    const change = getPermanentChange(date);
+    return change ? permanentDisplayShift(change, original).code : original.code;
+}
+
+function rosterCalendarAddedCodes(date) {
+    if (setup?.type !== "roster") return [];
+    return getAddedShifts(date).map((entry) => entry.code).filter(Boolean);
+}
+
+function calendarChangeIsAltered(date) {
+    const change = getPermanentChange(date);
+    return Boolean(change && ["swap_worked", "swap_off", "roster_change_worked", "roster_change_off"].includes(change.type));
+}
+
+function rosterCalendarColour(code) {
+    const upper = String(code || "").toUpperCase();
+    if (upper === "AL") return "calendar-yellow";
+    if (["PL", "PERSONAL"].includes(upper)) return "calendar-pink";
+    if (upper === "LSL") return "calendar-blue";
+    if (["LV", "OTHER"].includes(upper)) return "calendar-green";
+    if (["SDL", "SHUTDOWN"].includes(upper)) return "calendar-blue";
+    if (["WE", "ELSEWHERE"].includes(upper)) return "calendar-green";
+    return "";
+}
+
+function rosterCalendarFortnightShade(date) {
+    const anchor = parseDateKey(PAY_PERIOD_ANCHOR_START);
+    const daysFromAnchor = dayDifference(anchor, startOfDay(date));
+    const periodNumber = Math.floor(daysFromAnchor / PAY_PERIOD_LENGTH_DAYS);
+    const parity = ((periodNumber % 2) + 2) % 2;
+    return parity === 0 ? "pay-fortnight-light" : "pay-fortnight-dark";
+}
+
+function renderRosterCalendar() {
+    rosterCalendarGrid.innerHTML = "";
+    const year = rosterCalendarViewDate.getFullYear();
+    const month = rosterCalendarViewDate.getMonth();
+    rosterCalendarMonth.textContent = new Date(year, month, 1).toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+    const firstDay = new Date(year, month, 1).getDay();
+    const days = new Date(year, month + 1, 0).getDate();
+    for (let blank = 0; blank < firstDay; blank += 1) {
+        const spacer = document.createElement("span");
+        spacer.className = "roster-calendar-day blank";
+        rosterCalendarGrid.appendChild(spacer);
+    }
+    const ordered = [...pendingCalendarDates].sort((a, b) => a - b);
+    for (let day = 1; day <= days; day += 1) {
+        const date = new Date(year, month, day);
+        const key = dateKey(date);
+        const code = rosterCalendarCode(date);
+        const button = document.createElement("button");
+        button.type = "button";
+        const leaveColour = rosterCalendarColour(code);
+        const fortnightShade = rosterCalendarFortnightShade(date);
+        const addedCodes = rosterCalendarAddedCodes(date);
+        const casualCodes = setup?.type === "casual"
+            ? getCasualShifts(date).map((entry) => entry.code).filter(Boolean)
+            : [];
+        const altered = calendarChangeIsAltered(date);
+        button.className = `roster-calendar-day ${fortnightShade} ${leaveColour}`.trim();
+        const currentPeriod = getPayPeriodForDate(new Date());
+        if (date >= startOfDay(currentPeriod.start) && date <= startOfDay(currentPeriod.end) && !leaveColour) button.classList.add("pay-fortnight-active");
+        if (altered) button.classList.add("calendar-altered");
+        if (pendingCalendarDates.some((picked) => dateKey(picked) === key)) button.classList.add("selected");
+        if (["leave", "remove_leave"].includes(pendingChangeAction) && ordered.length === 2 && date >= ordered[0] && date <= ordered[1]) button.classList.add("in-range");
+        const change = setup?.type === "roster" ? getPermanentChange(date) : null;
+        const originalCode = setup?.type === "roster" ? String(getShiftForDate(date).shift.code || "") : "";
+        const baseIsVisibleWithExtras = code && !["O", "A"].includes(String(code).toUpperCase());
+        const codeItems = setup?.type === "casual"
+            ? casualCodes.map((value) => ({ value, extra: true })).slice(0, 3)
+            : addedCodes.length
+                ? [
+                    ...(baseIsVisibleWithExtras ? [{ value: code, extra: false }] : []),
+                    ...addedCodes.map((value) => ({ value, extra: true }))
+                  ].slice(0, 3)
+                : [];
+        if (change?.type === "swap_worked" && (change.sameDay || change.preserveOriginal)) {
+            const originalMarkup = change.sameDay
+                ? `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "-")}</span>`
+                : `<span class="calendar-roster-code">${escapeHtml(change.originalCode || originalCode || "-")}</span>`;
+            button.innerHTML = `${originalMarkup}<span class="calendar-roster-code swap-new">${escapeHtml(change.code || "-")}</span>`;
+        } else if (change?.type === "swap_off") {
+            button.innerHTML = `<span class="calendar-roster-code swap-original">${escapeHtml(change.originalCode || originalCode || "-")}</span><span class="calendar-roster-code swap-new">${escapeHtml(change.code || "O")}</span>`;
+        } else if (codeItems.length) {
+            const hideDateNumber = codeItems.length >= 3;
+            button.innerHTML = `${hideDateNumber ? "" : `<span class="calendar-date-number">${day}</span>`}${codeItems.map((item) => `<span class="calendar-roster-code${item.extra ? " altered-code" : ""}">${escapeHtml(item.value)}</span>`).join("")}`;
+        } else {
+            button.innerHTML = `<span class="calendar-date-number">${day}</span>${code ? `<span class="calendar-roster-code">${escapeHtml(code)}</span>` : ""}`;
+        }
+        const calendarActSchoolHoliday = showActSchoolHolidays ? getActSchoolHoliday(date) : "";
+        const calendarNswSchoolHoliday = showNswSchoolHolidays ? getNswSchoolHoliday(date) : "";
+        const calendarActPublicHoliday = showActPublicHolidays ? getActPublicHoliday(date) : "";
+        const calendarNswPublicHoliday = showNswPublicHolidays ? getNswPublicHoliday(date) : "";
+        if (calendarActSchoolHoliday || calendarNswSchoolHoliday) {
+            const icon = document.createElement("img");
+            icon.className = "calendar-school-holiday-icon";
+            icon.src = calendarNswSchoolHoliday ? "nsw-school-holidays-icon.svg" : "school-holidays-icon.png";
+            icon.alt = "";
+            icon.title = calendarNswSchoolHoliday || calendarActSchoolHoliday;
+            button.appendChild(icon);
+        }
+        if (calendarActPublicHoliday || calendarNswPublicHoliday) {
+            const marker = document.createElement("span");
+            marker.className = `calendar-public-holiday-marker${calendarNswPublicHoliday ? " nsw-holiday-text" : ""}`;
+            marker.textContent = calendarNswPublicHoliday && !calendarActPublicHoliday ? "NSW PH" : "PH";
+            marker.title = "Tap to see: " + [calendarActPublicHoliday, calendarNswPublicHoliday && calendarNswPublicHoliday !== calendarActPublicHoliday ? `NSW: ${calendarNswPublicHoliday}` : ""].filter(Boolean).join(" | ");
+            marker.addEventListener("click", (clickEvent) => {
+                clickEvent.stopPropagation();
+                openPersonalCalendarDetail(date);
+            });
+            button.appendChild(marker);
+        }
+        const personalEvents = getPersonalCalendarEvents(date);
+        if (personalEvents.length) {
+            const event = document.createElement("span");
+            event.className = `calendar-personal-event${personalEvents.length > 1 ? " multiple" : " single"}`;
+            event.textContent = personalEvents.length > 1
+                ? String(personalEvents.length)
+                : String(personalEvents[0]?.summary || "Planner event");
+            event.title = personalEvents.length === 1
+                ? `${personalEvents[0]?.summary || "Planner event"} - tap to enlarge`
+                : `${personalEvents.length} planned events - tap to enlarge`;
+            event.setAttribute("aria-label", `Open ${personalEvents.length} planner event${personalEvents.length === 1 ? "" : "s"} for ${formatAustralianDate(date)}`);
+            event.addEventListener("click", (clickEvent) => {
+                clickEvent.stopPropagation();
+                openPersonalCalendarDetail(date, personalEvents);
+            });
+            button.appendChild(event);
+        }
+        button.addEventListener("click", () => chooseRosterCalendarDate(date));
+        rosterCalendarGrid.appendChild(button);
+    }
+    updateRosterCalendarSummary();
+}
+
+function chooseRosterCalendarDate(date) {
+    const action = pendingChangeAction;
+    const originalCode = setup?.type === "casual" ? "" : String(getShiftForDate(date).shift.code || "").toUpperCase();
+    const isOff = ["O", "A"].includes(originalCode);
+    const partTime = setup?.employmentType === "parttime";
+
+    if (["lookup", "month_view", "add_shift"].includes(action)) {
+        pendingCalendarDates = [startOfDay(date)];
+    } else if (["leave", "remove_leave"].includes(action)) {
+        const key = dateKey(date);
+        const existingIndex = pendingCalendarDates.findIndex((picked) => dateKey(picked) === key);
+        if (existingIndex >= 0) {
+            pendingCalendarDates.splice(existingIndex, 1);
+        } else if (pendingCalendarDates.length >= 2) {
+            pendingCalendarDates = [startOfDay(date)];
+        } else {
+            pendingCalendarDates.push(startOfDay(date));
+        }
+    } else if (action === "swap") {
+        if (calendarSameDaySwap.checked) {
+            if (isOff) {
+                alert("A same-day swap must use an original working day.");
+                return;
+            }
+            pendingCalendarDates = [startOfDay(date)];
+        } else {
+            const key = dateKey(date);
+            const existingIndex = pendingCalendarDates.findIndex((picked) => dateKey(picked) === key);
+            if (existingIndex >= 0) {
+                pendingCalendarDates.splice(existingIndex, 1);
+            } else if (pendingCalendarDates.length >= 2) {
+                pendingCalendarDates = [startOfDay(date)];
+            } else {
+                pendingCalendarDates.push(startOfDay(date));
+            }
+        }
+    } else if (action === "roster_change") {
+        if (pendingCalendarDates.length === 0) {
+            if (isOff) { alert("Choose the original working day first."); return; }
+            pendingCalendarDates = [startOfDay(date)];
+        } else if (pendingCalendarDates.length === 1) {
+            if (originalCode !== "O") {
+                alert("Management Roster Change requires an original RDO as the second date.");
+                return;
+            }
+            pendingCalendarDates.push(startOfDay(date));
+        } else {
+            pendingCalendarDates = [];
+            chooseRosterCalendarDate(date);
+            return;
+        }
+    }
+    renderRosterCalendar();
+}
+
+function updateRosterCalendarSummary() {
+    const dates = pendingCalendarDates;
+    calendarOk.disabled = dates.length === 0 || (pendingChangeAction === "roster_change" && dates.length !== 2) || (pendingChangeAction === "swap" && (calendarSameDaySwap.checked ? dates.length !== 1 : dates.length !== 2));
+    if (!dates.length) {
+        calendarSelectionSummary.textContent = "No date selected.";
+        return;
+    }
+    if (["leave", "remove_leave"].includes(pendingChangeAction) && dates.length === 2) {
+        const ordered = [...dates].sort((a, b) => a - b);
+        calendarSelectionSummary.innerHTML = `<strong>Start:</strong> ${formatAustralianDate(ordered[0])}<br><strong>Finish:</strong> ${formatAustralianDate(ordered[1])}`;
+        return;
+    }
+    if (["swap", "roster_change"].includes(pendingChangeAction)) {
+        if (pendingChangeAction === "swap" && calendarSameDaySwap.checked && dates.length === 1) {
+            calendarSelectionSummary.innerHTML = `<strong>Same-day swap:</strong> ${formatAustralianDate(dates[0])}`;
+        } else if (pendingChangeAction === "swap" && pendingSwapType === "individual") {
+            calendarSelectionSummary.innerHTML = `<strong>Working day:</strong> ${formatAustralianDate(dates[0])}${dates[1] ? `<br><strong>Day becoming RDO:</strong> ${formatAustralianDate(dates[1])}` : ""}`;
+        } else {
+            calendarSelectionSummary.innerHTML = `<strong>Original working day:</strong> ${formatAustralianDate(dates[0])}${dates[1] ? `<br><strong>Replacement working day:</strong> ${formatAustralianDate(dates[1])}` : ""}`;
+        }
+        return;
+    }
+    calendarSelectionSummary.textContent = formatAustralianDate(dates[0]);
+}
+
+function confirmRosterCalendar() {
+    const action = pendingChangeAction;
+    const dates = [...pendingCalendarDates];
+    if (!dates.length) return;
+    rosterCalendarPage.classList.add("hidden");
+    if (["lookup", "month_view"].includes(action)) {
+        selectedDate = dates[0];
+
+    if (action === "month_view") {
+        logHeguiEvent("calendar_date_selected", {
+        action: "month_view",
+        details: {
+        selected_date: dateKey(dates[0])
+        }
+  });
+}    
+        pendingChangeAction = null;
+        pendingCalendarDates = [];
+        renderHome();
+        return;
+    }
+    if (action === "add_shift" && setup?.type === "casual") {
+        selectedDate = dates[0];
+        pendingChangeAction = null;
+        pendingCalendarDates = [];
+        openCasualShiftEditor();
+        return;
+    }
+    if (action === "remove_leave") {
+        const ordered = [...dates].sort((a, b) => a - b);
+        const start = ordered[0];
+        const finish = ordered[1] || ordered[0];
+        const all = loadPermanentChanges();
+        const profileId = profiles[activeProfileIndex]?.id;
+        const records = all[profileId] || {};
+        let removed = 0;
+        for (let date = startOfDay(start); date <= finish; date = addDays(date, 1)) {
+            const key = dateKey(date);
+            const entry = records[key];
+            if (entry?.type === "leave") {
+                delete records[key];
+                removed += 1;
+            }
+        }
+        all[profileId] = records;
+        localStorage.setItem(STORAGE_PERMANENT_CHANGES, JSON.stringify(all));
+        pendingChangeAction = null;
+        pendingCalendarDates = [];
+        if (!removed) alert("No leave was found in that date range.");
+        renderHome();
+        return;
+    }
+    if (editingPermanentDates) {
+        pendingCalendarDates = dates.map(startOfDay);
+        editingPermanentDates = false;
+        permanentChangePage.classList.remove("hidden");
+        restorePermanentEditorSnapshot();
+        renderPermanentChangeDateSummary();
+        return;
+    }
+    openPermanentChangeEditor(action, dates);
+}
+
+function renderPermanentChangeDateSummary() {
+    const action = permanentChangeType.value;
+    const ordered = [...pendingCalendarDates].sort((a, b) => a - b);
+    document.querySelector("#permanent-change-date").textContent = action === "leave" && ordered.length > 1
+        ? `${formatAustralianDate(ordered[0])}-${formatAustralianDate(ordered[ordered.length - 1])}`
+        : pendingCalendarDates.map(formatAustralianDate).join(" | ");
+    if (["swap", "roster_change"].includes(action) && pendingCalendarDates.length === 2) {
+        swapDayOffDate.value = dateKey(pendingCalendarDates[1]);
+        changeDateSummary.innerHTML = action === "swap" && swapType.value === "individual"
+            ? `<strong>Working extra day:</strong> ${formatAustralianDate(pendingCalendarDates[0])}<br><strong>Nominated RDO:</strong> ${formatAustralianDate(pendingCalendarDates[1])}`
+            : `<strong>Working day:</strong> ${formatAustralianDate(pendingCalendarDates[0])}<br><strong>RDO/ADO:</strong> ${formatAustralianDate(pendingCalendarDates[1])}`;
+    } else {
+        swapDayOffDate.value = "";
+        changeDateSummary.textContent = "";
+    }
+}
+
+function openAddedShiftEditor(entry) {
+    if (!entry) return;
+    editingAddedShiftId = entry.id;
+    selectedDate = parseDateKey(entry.date);
+    openPermanentChangeEditor("add_shift", [selectedDate]);
+    const standardIndex = shiftCodes.findIndex((shift) => shift.code === entry.code);
+    permanentShiftCode.value = standardIndex >= 0 ? String(standardIndex) : "spare";
+    permanentStartTime.value = entry.start || "";
+    permanentFinishTime.value = entry.finish || "";
+    permanentBreak.checked = Number(entry.unpaidBreakMinutes || 0) >= 30;
+    permanentChangeNotes.value = entry.notes || "";
+    renderAutoAdjustMarkers(permanentAutoAdjustMarkers, entry);
+    renderPermanentChangeDateSummary();
+}
+
+function openPermanentChangeEditor(action = "add_shift", dates = [selectedDate]) {
+    if (action !== "add_shift" || !editingAddedShiftId) editingAddedShiftId = null;
+    pendingChangeAction = action;
+    pendingCalendarDates = dates.map(startOfDay);
+    permanentChangeType.value = action;
+    leaveType.value = pendingLeaveType || "annual_leave";
+    swapType.value = pendingSwapType || "individual";
+    permanentStartTime.value = "";
+    permanentFinishTime.value = "";
+    permanentBreak.checked = false;
+    permanentChangeNotes.value = "";
+    permanentShiftCode.value = "";
+    renderAutoAdjustMarkers(permanentAutoAdjustMarkers, null);
+    renderPermanentChangeDateSummary();
+    updatePermanentChangeFields();
+    permanentChangePage.classList.remove("hidden");
+}
+
+function updatePermanentChangeFields() {
+    const type = permanentChangeType.value;
+    leaveTypeField.classList.add("hidden");
+    swapTypeField.classList.toggle("hidden", type !== "swap");
+    permanentShiftFields.classList.toggle("hidden", type === "leave" || type === "roster_change");
+    swapDateField.classList.toggle("hidden", !["swap", "roster_change"].includes(type));
+    const canAddAnother = type === "add_shift" &&
+        setup?.employmentType === "parttime" &&
+        !editingAddedShiftId;
+    savePermanentChangeAddAnotherButton.classList.toggle("hidden", !canAddAnother);
+}
+
+function selectedPermanentShift() {
+    if (permanentShiftCode.value === "") return null;
+    if (permanentShiftCode.value === "spare") {
+        return { code: "SPARE", start: permanentStartTime.value, finish: permanentFinishTime.value };
+    }
+    return shiftCodes[Number(permanentShiftCode.value)] || null;
+}
+
+function fillPermanentShiftTimes() {
+    if (permanentShiftCode.value === "" || permanentShiftCode.value === "spare") return;
+    const shift = shiftCodes[Number(permanentShiftCode.value)];
+    if (!shift) return;
+    permanentStartTime.value = shift.start;
+    permanentFinishTime.value = shift.finish;
+    const gross = calculatePaidMinutes(shift.start, shift.finish, 0) || 0;
+    permanentBreak.checked = gross > 5 * 60;
+}
+
+function capturePermanentEditorSnapshot() {
+    return {
+        leaveType: leaveType.value,
+        swapType: swapType.value,
+        shiftCode: permanentShiftCode.value,
+        start: permanentStartTime.value,
+        finish: permanentFinishTime.value,
+        unpaidBreak: permanentBreak.checked,
+        notes: permanentChangeNotes.value
+    };
+}
+
+function restorePermanentEditorSnapshot() {
+    if (!permanentEditorSnapshot) return;
+    leaveType.value = permanentEditorSnapshot.leaveType;
+    swapType.value = permanentEditorSnapshot.swapType;
+    permanentShiftCode.value = permanentEditorSnapshot.shiftCode;
+    permanentStartTime.value = permanentEditorSnapshot.start;
+    permanentFinishTime.value = permanentEditorSnapshot.finish;
+    permanentBreak.checked = permanentEditorSnapshot.unpaidBreak;
+    permanentChangeNotes.value = permanentEditorSnapshot.notes;
+    updatePermanentChangeFields();
+    permanentEditorSnapshot = null;
+}
+
+function editPermanentChangeDates() {
+    const action = permanentChangeType.value;
+    permanentEditorSnapshot = capturePermanentEditorSnapshot();
+    editingPermanentDates = true;
+    permanentChangePage.classList.add("hidden");
+    pendingChangeAction = action;
+    rosterCalendarViewDate = new Date(
+        (pendingCalendarDates[0] || selectedDate).getFullYear(),
+        (pendingCalendarDates[0] || selectedDate).getMonth(),
+        1
+    );
+
+    const config = {
+        leave: [
+            ({
+                annual_leave: "Annual Leave",
+                personal_leave: "Personal Leave",
+                long_service_leave: "Long Service Leave",
+                other_leave: "Other Leave"
+            })[leaveType.value] || "Leave",
+            "Choose any start and finish dates. The earlier date becomes Start and the later date becomes Finish."
+        ],
+        swap: [
+            swapType.value === "colleague" ? "Colleague Swap" : "Individual Swap",
+            "Choose the two swap dates in either order. H\u00e9 Gu\u01d0 will determine their roles automatically."
+        ],
+        add_shift: [setup?.employmentType === "fulltime" ? "Overtime" : "Extra Hours", "Choose one date."],
+        roster_change: [
+            "Management Roster Change",
+            "Choose the original working day, then choose the original RDO. The currently displayed roster day does not set either date."
+        ]
+    }[action];
+
+    rosterCalendarTitle.textContent = config[0];
+    rosterCalendarInstructions.textContent = config[1];
+    rosterCalendarPage.classList.remove("hidden");
+
+    logHeguiEvent("calendar_open", {
+     action: action,
+    details: {
+    calendar_mode: action
+  }
+});
+    renderRosterCalendar();
+}
+
+function closePermanentChangeEditor() {
+    permanentChangePage.classList.add("hidden");
+    editingAddedShiftId = null;
+    pendingChangeAction = null;
+    pendingCalendarDates = [];
+    pendingLeaveType = "annual_leave";
+    pendingSwapType = "individual";
+    editingPermanentDates = false;
+    permanentEditorSnapshot = null;
+}
+
+function isRosterWorkingDay(date) {
+    if (setup?.type === "casual") return false;
+    const code = String(getShiftForDate(date).shift.code || "").toUpperCase();
+    return !["O", "A", "", "-"].includes(code);
+}
+
+
+function shiftClockMinutes(value) {
+    const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return hour * 60 + minute;
+}
+
+function shiftInterval(start, finish) {
+    const startMinutes = shiftClockMinutes(start);
+    let finishMinutes = shiftClockMinutes(finish);
+    if (startMinutes === null || finishMinutes === null) return null;
+    if (finishMinutes <= startMinutes) finishMinutes += 24 * 60;
+    return { start: startMinutes, finish: finishMinutes };
+}
+
+function rosterShiftIntervalForDate(date) {
+    if (!setup || setup.type === "casual") return null;
+    const shift = getShiftForDate(date).shift;
+    const code = String(shift?.code || "").toUpperCase();
+    if (["O", "A", "", "-"].includes(code)) return null;
+    const parts = String(shift?.time || "").split("-");
+    if (parts.length !== 2) return null;
+    const interval = shiftInterval(parts[0], parts[1]);
+    return interval ? { ...interval, label: `${shift.code} ${parts[0]}-${parts[1]}`, kind: "roster" } : null;
+}
+
+function occupiedShiftIntervals(date, excludeId = null, casualMode = false) {
+    const intervals = [];
+    if (!casualMode) {
+        const rosterInterval = rosterShiftIntervalForDate(date);
+        if (rosterInterval) intervals.push(rosterInterval);
+        getAddedShifts(date).filter((entry) => entry?.id !== excludeId).forEach((entry) => {
+            const interval = shiftInterval(entry.start, entry.finish);
+            if (interval) intervals.push({ ...interval, label: `${entry.code} ${entry.start}-${entry.finish}`, kind: "added" });
+        });
+    } else {
+        getCasualShifts(date).filter((entry) => entry?.id !== excludeId).forEach((entry) => {
+            const interval = shiftInterval(entry.start, entry.finish);
+            if (interval) intervals.push({ ...interval, label: `${entry.code} ${entry.start}-${entry.finish}`, kind: "casual" });
+        });
+    }
+    return intervals.sort((a, b) => a.start - b.start);
+}
+
+function autoFixAddedShiftOverlap(date, startValue, finishValue, excludeId = null, casualMode = false) {
+    const original = shiftInterval(startValue, finishValue);
+    if (!original) return { ok: false, message: "Enter a valid start and finish time." };
+
+    let start = original.start;
     let finish = original.finish;
     let startAdjusted = false;
     let finishAdjusted = false;
