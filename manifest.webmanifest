@@ -2,6 +2,8 @@
   "name": "H\u00e9 Gu\u01d0 Roster Planner",
   "short_name": "H\u00e9 Gu\u01d0",
   "start_url": "./",
+  "scope": "./",
+  "id": "/",
   "display": "standalone",
   "background_color": "#101214",
   "theme_color": "#101214",
