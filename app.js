@@ -588,7 +588,23 @@ function personalEventOccursOnDate(event, date) {
 function loadPlannerEvents() {
     try {
         const events = JSON.parse(localStorage.getItem(STORAGE_PLANNER_EVENTS)) || [];
-        return Array.isArray(events) ? events : [];
+        if (!Array.isArray(events)) return [];
+
+        let changed = false;
+        const migrated = events.map((event, index) => {
+            if (event?.id) return event;
+            changed = true;
+            return {
+                ...event,
+                id: `planner-legacy-${event?.date || "unknown"}-${index}-${Date.now()}`
+            };
+        });
+
+        if (changed) {
+            localStorage.setItem(STORAGE_PLANNER_EVENTS, JSON.stringify(migrated));
+        }
+
+        return migrated;
     } catch (error) {
         return [];
     }
@@ -2518,7 +2534,7 @@ function renderRosterCalendar() {
             const event = document.createElement("span");
             event.className = `calendar-personal-event${personalEvents.length > 1 ? " multiple" : " single"}`;
             event.textContent = personalEvents.length > 1
-                ? `${personalEvents.length} events`
+                ? String(personalEvents.length)
                 : String(personalEvents[0]?.summary || "Planner event");
             event.title = personalEvents.length === 1
                 ? `${personalEvents[0]?.summary || "Planner event"} - tap to view or remove`
