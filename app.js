@@ -2518,12 +2518,12 @@ function renderRosterCalendar() {
             const event = document.createElement("span");
             event.className = `calendar-personal-event${personalEvents.length > 1 ? " multiple" : " single"}`;
             event.textContent = personalEvents.length > 1
-                ? String(personalEvents.length)
+                ? `${personalEvents.length} events`
                 : String(personalEvents[0]?.summary || "Planner event");
             event.title = personalEvents.length === 1
-                ? `${personalEvents[0]?.summary || "Planner event"} - tap to enlarge`
-                : `${personalEvents.length} planned events - tap to enlarge`;
-            event.setAttribute("aria-label", `Open ${personalEvents.length} planner event${personalEvents.length === 1 ? "" : "s"} for ${formatAustralianDate(date)}`);
+                ? `${personalEvents[0]?.summary || "Planner event"} - tap to view or remove`
+                : `${personalEvents.length} planned events - tap to view or remove`;
+            event.setAttribute("aria-label", `Manage ${personalEvents.length} planner event${personalEvents.length === 1 ? "" : "s"} for ${formatAustralianDate(date)}`);
             event.addEventListener("click", (clickEvent) => {
                 clickEvent.stopPropagation();
                 openPersonalCalendarDetail(date, personalEvents);
