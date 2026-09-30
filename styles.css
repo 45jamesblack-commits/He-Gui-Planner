@@ -1453,7 +1453,8 @@ body {
 .planner-form-buttons { justify-content: flex-end; }
 .planner-event-form input,
 .planner-event-form select { width: 100%; min-height: 44px; }
-.planner-remove-event {
+.planner-remove-event,
+.planner-remove-imported-event {
     min-height: 36px;
     padding: 6px 10px;
     border: 1px solid #c95b5b;

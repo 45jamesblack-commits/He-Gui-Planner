@@ -17,6 +17,7 @@ const STORAGE_SHOW_STARTUP_SPLASH = "heguiShowStartupSplash";
 const STORAGE_PERSONAL_CALENDAR = "heguiPersonalCalendar";
 const STORAGE_PERSONAL_CALENDAR_CACHE = "heguiPersonalCalendarCacheV27";
 const STORAGE_PLANNER_EVENTS = "heguiPlannerEventsV1";
+const STORAGE_HIDDEN_IMPORTED_EVENTS = "heguiHiddenImportedEventsV1";
 const STORAGE_DISPLAY_THEME = "heguiDisplayTheme";
 const STORAGE_UNLOCKED_FINAL_SHIFTS = "heguiUnlockedFinalShiftsAlphaV27";
 const STORAGE_WEEK_PANEL_HIDDEN = "heguiWeekPanelHidden";
@@ -615,6 +616,30 @@ function savePlannerEvents(events) {
     window.HeguiNotifications?.sync(events);
 }
 
+function importedEventKey(event, date) {
+    return [
+        event?.uid || "",
+        event?.start?.iso || event?.start?.date || "",
+        event?.summary || "",
+        dateKey(date)
+    ].join("|");
+}
+
+function loadHiddenImportedEvents() {
+    try {
+        const hidden = JSON.parse(localStorage.getItem(STORAGE_HIDDEN_IMPORTED_EVENTS)) || [];
+        return Array.isArray(hidden) ? hidden : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function hideImportedEvent(event, date) {
+    const hidden = new Set(loadHiddenImportedEvents());
+    hidden.add(importedEventKey(event, date));
+    localStorage.setItem(STORAGE_HIDDEN_IMPORTED_EVENTS, JSON.stringify([...hidden]));
+}
+
 function getPlannerEvents(date) {
     const key = dateKey(date);
     return loadPlannerEvents()
@@ -635,8 +660,12 @@ function getPlannerEvents(date) {
 function getPersonalCalendarEvents(date) {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_PERSONAL_CALENDAR)) || {}; } catch (error) {}
+    const hiddenImported = new Set(loadHiddenImportedEvents());
     const imported = saved.enabled
-        ? personalCalendarEvents.filter((event) => personalEventOccursOnDate(event, date))
+        ? personalCalendarEvents.filter((event) =>
+            personalEventOccursOnDate(event, date) &&
+            !hiddenImported.has(importedEventKey(event, date))
+          )
         : [];
     return [...getPlannerEvents(date), ...imported].sort((a, b) => {
         if (a.start?.allDay !== b.start?.allDay) return a.start?.allDay ? -1 : 1;
@@ -715,7 +744,9 @@ function openPersonalCalendarDetail(date, events = getPersonalCalendarEvents(dat
                     <article class="personal-calendar-detail-event${event.plannerEvent ? " planner-owned-event" : ""}">
                         <div class="planner-event-heading">
                             <h3>${escapeHtml(event.summary || "Calendar event")}</h3>
-                            ${event.plannerEvent ? `<button type="button" class="planner-remove-event" data-event-id="${escapeHtml(event.id)}">Remove</button>` : ""}
+                            ${event.plannerEvent
+                                ? `<button type="button" class="planner-remove-event" data-event-id="${escapeHtml(event.id)}">Remove</button>`
+                                : `<button type="button" class="planner-remove-imported-event" data-event-key="${escapeHtml(importedEventKey(event, date))}" title="Remove from He Gui only">Remove</button>`}
                         </div>
                         ${personalCalendarEventTime(event) ? `<p class="personal-calendar-detail-time">${escapeHtml(personalCalendarEventTime(event))}</p>` : ""}
                         ${event.location ? `<p><strong>Location:</strong> ${escapeHtml(event.location)}</p>` : ""}
@@ -760,6 +791,19 @@ function openPersonalCalendarDetail(date, events = getPersonalCalendarEvents(dat
         const removeButton = event.target.closest(".planner-remove-event");
         if (removeButton) {
             savePlannerEvents(loadPlannerEvents().filter((item) => item.id !== removeButton.dataset.eventId));
+            openPersonalCalendarDetail(date);
+            if (setup && rosters.length) renderHome();
+            if (!rosterCalendarPage?.classList.contains("hidden")) renderRosterCalendar();
+            return;
+        }
+
+        const removeImportedButton = event.target.closest(".planner-remove-imported-event");
+        if (removeImportedButton) {
+            const importedEvent = events.find((item) =>
+                !item.plannerEvent &&
+                importedEventKey(item, date) === removeImportedButton.dataset.eventKey
+            );
+            if (importedEvent) hideImportedEvent(importedEvent, date);
             openPersonalCalendarDetail(date);
             if (setup && rosters.length) renderHome();
             if (!rosterCalendarPage?.classList.contains("hidden")) renderRosterCalendar();
